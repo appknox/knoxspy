@@ -15,6 +15,24 @@ class DBManager {
         }))
     }
 
+    getLibraries(callback: (data: any) => void) {
+        this.db.all('SELECT * FROM library', (err: any, rows: any) => {
+            if (err) {
+                console.error('Error querying database:', err.message);
+                callback([]);
+            } else {
+                const jsonData = rows.map((row: any) => ({
+                    id: row.id,
+                    name: row.name,
+                    file: row.file,
+                    platform: row.platform
+                }));
+                // console.log(jsonData);
+
+                callback(JSON.stringify(jsonData));
+            }
+        });
+    }
       
     getRowFromDatabase(rowId: number, callback: (data: any) => void) {
         this.db.all(`SELECT * FROM traffic where id=${rowId}`, (err: any, rows: any) => {
@@ -28,9 +46,12 @@ class DBManager {
                     id: rows[0].id,
                     method: rows[0].method,
                     host: rows[0].host,
-                    url: rows[0].url,
-                    status: rows[0].status,
-                    length: rows[0].length,
+                    endpoint: rows[0].endpoint,
+                    status_code: rows[0].status_code,
+                    request_headers: rows[0].request_headers,
+                    response_headers: rows[0].response_headers,
+                    response_body: rows[0].response_body,
+                    request_body: rows[0].request_body,
                 };
                 // console.log(jsonData);
 
@@ -49,9 +70,12 @@ class DBManager {
                     id: row.id,
                     method: row.method,
                     host: row.host,
-                    url: row.url,
-                    status: row.status,
-                    length: row.length,
+                    endpoint: row.endpoint,
+                    status_code: row.status_code,
+                    request_headers: row.request_headers,
+                    response_headers: row.response_headers,
+                    response_body: row.response_body,
+                    request_body: row.request_body,
                 }));
                 // console.log(jsonData);
 

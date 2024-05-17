@@ -3,22 +3,36 @@
         <div class="section-group">
             <div class="section section-apps">
                 <div class="section-header">
-                    <h4>Apps For</h4>
-                    <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" />
+                    <div class="section-header-device">
+                        <h4>Apps For</h4>
+                        <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" />
+                    </div>
+                    <AutoComplete v-model="selectedLibrary" optionLabel="name" :suggestions="filteredLibraryList" @complete="search" />
+
+                    <div class="section-header-search">
+                        <IconField iconPosition="left">
+                            <InputIcon class="pi pi-search"> </InputIcon>
+                            <InputText v-model="appSearch" placeholder="Search" :onKeydown="searchApp" />
+                        </IconField>
+                    </div>
                 </div>
                 <ul v-if="data">
-                    <li v-for="item in apps" :key="item.id" @click="startApp(item.identifier, item.name)">
+                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.identifier, item.name)">
                         <img :src="item.icon">
                         <p>{{ item.name }}</p>
                     </li>
                 </ul>
-                <Dialog v-model:visible="visibleDialog" modal header="Edit Profile" :style="{ width: '25rem' }">
-                    <template #header>
-                        <div class="inline-flex align-items-center justify-content-center gap-2">
-                            <span class="font-bold white-space-nowrap">Connected to the app!</span>
-                        </div>
-                    </template>
-                </Dialog>
+                <div class="appPopupWrapper" :style="{'display': isConnected ? 'block' : 'none'}">
+                    <Card class="appPopup">
+                        <template #content>
+                            <i class="pi pi-info-circle" style="font-size: 35px; margin-bottom: 20px"></i>
+                            <p class="m-0">
+                                Connected to <t style="display: block;">'{{ connectionAppName }}'</t> App!
+                                <span style="display: block"><router-link to="/traffic">Switch to HTTP Traffic tab</router-link></span>
+                            </p>
+                        </template>
+                    </Card>
+                </div>
             </div>
         </div>
 	</div>
@@ -28,37 +42,68 @@
 import { defineComponent } from "vue";
 import Dropdown from 'primevue/dropdown';
 import Dialog from 'primevue/dialog';
+import InputText from "primevue/inputtext";
+import IconField from 'primevue/iconfield';
+import InputIcon from 'primevue/inputicon';
+import Card from "primevue/card";
+import AutoComplete from "primevue/autocomplete";
 
 export default defineComponent({
 	name: 'DashboardPage',
     components: {
         Dropdown,
         Dialog,
+        InputText,
+        InputIcon,
+        IconField,
+        Card,
+        AutoComplete
     },
     data() {
         return {
-            selectedDevice: "a706b7f6f4012bb7caa150737cd5273463303e24",
+            selectedDevice: "2d2dfbf",
             selectedApp: "",
             data: [],
             apps: null,
-            visibleDialog: false,
+            visibleDialog: true,
             visiblePopup: "none",
             ws: null,
             isConnected: false,
-            connection_status: "test"
+            connection_status: "test",
+            appSearch: null,
+            connectionAppName: "",
+            connectionSessionId: -1,
+            libraryList: [{name:'AFNetworking', file:'afnetworking.js'}, {name:'TrustKit', file:'trustkit.js'}, {name:'AlamoFile', file:'alamofire.js'}, {name:'OkHTTP', file:'okhttp.js'}],
+            filteredLibraryList: [],
+            selectedLibrary: null
         }
     },
     mounted() {
+    },
+    computed: {
+        sortedApps() {
+            var query = this.appSearch;
+            // console.log(query);
+            
+            if(query && query.trim() !== "") {
+                query = query.toLowerCase();
+                return this.apps.filter(app => app.name.toLowerCase().includes(query))
+                                .sort((a, b) => a.name.localeCompare(b.name));
+            } else {
+                return this.apps;
+            }
+        },
     },
     created() {
         const url = 'ws://192.168.29.203:8000';
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
-            this.isConnected = true;
+            // this.isConnected = true;
             console.log('Connected to WebSocket server');
             const json = {"action":"devices"}
             this.ws.send(JSON.stringify(json))
+            // this.fetchApps()
             // this.startApp("com.appknox.SSL-Pinning-Test", "SSL Pinning Test")
         };
 
@@ -76,6 +121,19 @@ export default defineComponent({
                 this.apps = message['apps'];
             } else if(message['action'] === 'startApp') {
                 this.visibleDialog = true;
+            } else if(message['action'] === 'deviceUpdate') {
+                const tmpSessionId = message['sessionId']
+                if(tmpSessionId === this.connectionSessionId) {
+                    this.connectionAppName = `(${message['appName']})`
+                    if(message['message'] === "Connected") {
+                        this.isConnected = true;
+                    } else {
+                        this.isConnected = false;
+                    }
+                } else {
+                    console.log("Got info for an old app i think" + tmpSessionId);
+                    
+                }
             }
         };
 
@@ -97,19 +155,77 @@ export default defineComponent({
         async startApp(identifier: string, name: string) {
             this.selectedApp = identifier
             console.log(this.selectedDevice);
-            const json = {"action":"startApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name}
+            const sessionId = Math.floor(Math.random() * 100000);
+            this.connectionSessionId = sessionId
+            const json = {"action":"startApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': this.selectedLibrary.file}
             this.ws.send(JSON.stringify(json))
+        },
+        searchApp() {
+            console.log("Searching");
+        },
+        search(event: any) {
+            setTimeout(() => {
+                if (!event.query.trim().length) {
+                    this.filteredLibraryList = [...this.libraryList];
+                } else {
+                    this.filteredLibraryList = this.libraryList.filter((library: any) => {
+                        return library.name.toLowerCase().startsWith(event.query.toLowerCase());
+                    });
+                }
+            }, 250);
         }
     },
 });
 </script>
 
 <style>
+.appPopupWrapper {
+    background-color: #000a;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+.appPopupWrapper p {
+    font-variant: small-caps;
+    font-size: 25px;
+    padding: 0px;
+    margin: 0;
+    font-weight: bold;
+}
+.appPopupWrapper p span {
+    color: #10b981;
+    font-weight: initial;
+    font-variant: normal;
+    font-size: 16px;
+    margin-top: 30px;
+    text-decoration: none;
+}
+.appPopupWrapper p span a {
+    color: #10b981;
+    transition: all linear .1s;
+    text-decoration: none;
+}
+.appPopupWrapper p span a:hover {
+    text-shadow: 1px 1px 1px #0005;
+}
+.appPopup {
+    box-shadow: 0 0 20px -10px #000;
+    position: absolute;
+    width: 400px;
+    top: 250px;
+    left: 50%;
+    margin-left: -200px;
+    display: block;
+}
 .page {
-	position: absolute;
-	left: 200px;
+    /* position: relative; */
+	/* position: absolute;
+	left: 200px; */
     overflow: hidden;
-	width: calc(100% - 200px);
+    flex-grow: 1;
+	/* width: calc(100% - 200px); */
 	height: 100%;
 	background-color: #222831;
     background-color: #fff;
@@ -149,12 +265,17 @@ export default defineComponent({
 .section-header {
     flex-wrap: wrap;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: space-between;
     border-bottom: 1px solid #ddd;
     padding: 0 25px;
     margin: 0 45px;
-    height: 90px;
+    height: 60px;
+}
+.section-header .section-header-device {
+    display: flex;
+    column-gap: 10px;
+    margin: 0;
 }
 .section-header > div {
     margin-left: 20px;

@@ -7,10 +7,12 @@ export default class Channels {
     session: frida.Session
     changedSignal!: frida.DevicesChangedHandler;
     name: string
+    sessionId: number
 
-    constructor(session: frida.Session, name: string) {
+    constructor(session: frida.Session, name: string, sessionId: number) {
         this.session = session
         this.name = name
+        this.sessionId = sessionId
         console.log("Channel has been setup!");
     }
 
@@ -29,7 +31,7 @@ export default class Channels {
         const ws = new WebSocket('ws://localhost:8000')
         ws.on('open', () => {
             console.log("Channel connected to the ws server!");
-            ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Connected', 'appName': this.name}));
+            ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Connected', 'appName': this.name, 'sessionId': this.sessionId}));
         })
 
 
@@ -40,7 +42,7 @@ export default class Channels {
             console.log("Disconnected")
             console.log(reason);
             
-            ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Disconnected', 'appName': this.name}));
+            ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Disconnected', 'appName': this.name, 'sessionId': this.sessionId}));
         })
     }
 }

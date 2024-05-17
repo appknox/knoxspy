@@ -1,23 +1,51 @@
 <template>
     <div class="page">
         <!-- <v-grid :source="rows" :columns="columns" /> -->
-        <DataTable :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
-            <template #header>
-                <div class="flex justify-content-end" style="display: flex; justify-content: space-between;">
-                    <Button type="button" icon="pi pi-filter-slash" label="Clear" outlined @click="" />
-                    <IconField iconPosition="left">
-                        <InputIcon class="pi pi-search"> </InputIcon>
-                        <InputText v-model="filters['global'].value" placeholder="Keyword Search" />
-                    </IconField>
-                </div>
-            </template>
-            <Column field="id" header="#" sortable style="width: 50px; font-size: 13px"></Column>
-            <Column field="method" header="Method" sortable style="width: 100px; font-size: 13px"></Column>
-            <Column field="host" header="Host" sortable style="width: 200px; font-size: 13px"></Column>
-            <Column field="url" header="Endpoint" sortable style="width: 300px; font-size: 13px"></Column>
-            <Column field="status" header="Status" sortable style="width: 100px; font-size: 13px"></Column>
-            <Column field="length" header="Length" sortable style="width: 70px; font-size: 13px"></Column>
-        </DataTable>
+        
+        <Splitter style="height: 100vh" layout="vertical">
+            <SplitterPanel class="flex align-items-center justify-content-center" :size="60">
+                <DataTable selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
+                    <template #header :style="{'margin':0, 'padding':0}" class="traffic-header" :class="{'hidden': visibleTrafficHeader}">
+                        <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: space-between;" :style="{'display': visibleTrafficHeader ? 'flex': 'none'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
+                            <Button type="button" icon="pi pi-filter-slash" label="Clear" outlined @click="" />
+                            <IconField iconPosition="left">
+                                <InputIcon class="pi pi-search"> </InputIcon>
+                                <InputText v-model="filters['global'].value" placeholder="Keyword Search" />
+                            </IconField>
+                        </div>
+                    </template>
+                    <Column field="id" header="#" sortable style="width: 50px; font-size: 13px"></Column>
+                    <Column field="method" header="Method" sortable style="width: 100px; font-size: 13px"></Column>
+                    <Column field="host" header="Host" sortable style="width: 200px; font-size: 13px"></Column>
+                    <Column field="endpoint" header="Endpoint" sortable style="width: 300px; font-size: 13px"></Column>
+                    <Column field="status_code" header="Status" sortable style="width: 100px; font-size: 13px"></Column>
+                    <Column field="length" header="Length" sortable style="width: 70px; font-size: 13px"></Column>
+                </DataTable>
+            </SplitterPanel>
+            <SplitterPanel :size="40">
+                <Splitter class="history-viewer-split">
+                    <SplitterPanel class="flex align-items-center justify-content-center" :size="50">
+                        <VCodeBlock
+                            :code="requestContent"
+                            highlightjs
+                            lang="http"
+                            theme="vs"
+                            style="text-align: left;"
+                        />
+                    </SplitterPanel>
+                    <SplitterPanel class="flex align-items-center justify-content-center" :size="50">
+                        <VCodeBlock
+                            :code="responseContent"
+                            highlightjs
+                            lang="http"
+                            theme="atom-one-light"
+                            style="text-align: left;"
+                        />
+                    </SplitterPanel>
+                </Splitter>
+            </SplitterPanel>
+        </Splitter>
+
     </div>
 </template>
 
@@ -31,6 +59,17 @@ import { FilterMatchMode } from 'primevue/api';
 import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import Button from 'primevue/button';
+import Splitter from 'primevue/splitter';
+import SplitterPanel from 'primevue/splitterpanel';
+import { VCodeBlock } from '@wdns/vue-code-block';
+// import Prism from "prismjs";
+// import "prismjs/themes/prism-dark.css";
+// import 'prismjs/components/prism-http';
+import HighlightJS from 'highlightjs';
+import "highlightjs/styles/vs.css";
+
+
+
 export default defineComponent({
     name: 'App',
     data() {
@@ -43,8 +82,8 @@ export default defineComponent({
                 { prop: "id", name: "#", sortable: true, size: 50, columnType: 'numeric', cellCompare: this.naturalSort, order: 'asc'},
                 { prop: "method", name: "Method", sortable: true, size: 100 },
                 { prop: "host", name: "Host", sortable: true, size: 200 },
-                { prop: "url", name: "URL", sortable: true, size: window.innerWidth - 200 - 50 - 100 - 200 - 100 - 70 },
-                { prop: "status", name: "Status Code", sortable: true, size: 100 },
+                { prop: "endpoint", name: "URL", sortable: true, size: window.innerWidth - 200 - 50 - 100 - 200 - 100 - 70 },
+                { prop: "status_code", name: "Status Code", sortable: true, size: 100 },
                 { prop: "length", name: "Length", sortable: true, size: 70 }
             ],
             filters: {
@@ -53,6 +92,9 @@ export default defineComponent({
                 endpoint: { value: null, matchMode: FilterMatchMode.CONTAINS }
             },
             rows: [],
+            requestContent: "",
+            responseContent: "",
+            visibleTrafficHeader: false,
         };
     },
     components: {
@@ -62,7 +104,11 @@ export default defineComponent({
         InputText,
         IconField,
         InputIcon,
-        Button
+        Button,
+        Splitter,
+        SplitterPanel,
+        VCodeBlock,
+        HighlightJS
     },
     created() {
         // Replace with your server URL
@@ -100,6 +146,24 @@ export default defineComponent({
         };
     },
     methods: {
+        toggleTrafficHeader() {
+            this.visibleTrafficHeader = !this.visibleTrafficHeader
+        },
+        onRequestSelect(event: any) {
+            var tmpData = event.data.method + " " + event.data.endpoint + "\n"
+            tmpData += JSON.parse(event.data.request_headers).join("\n")
+            if(event.data.request_body) {
+                tmpData += "\n\n" + event.data.request_body
+            } else {
+                tmpData += "\n\n " 
+            }
+            
+            this.requestContent = tmpData
+            tmpData = JSON.parse(event.data.response_headers).join("\n")
+            tmpData += "\n\n" + event.data.response_body
+            
+            this.responseContent = tmpData
+        },
         sendMessage() {
             if (this.isConnected) {
                 this.connection.send(JSON.stringify(this.message)); // Send JSON data
@@ -131,6 +195,20 @@ export default defineComponent({
 
 
 <style scoped>
+.p-datatable .p-datatable-header {
+    padding: 0 !important;
+    margin: 0;
+}
+.history-viewer-split pre {
+    text-align: left;
+    font: 15px "Fira Code";
+}
+.traffic-history {
+    height: 60vh;
+}
+.traffic-viewer {
+    height: 30vh;
+}
 .p-datatable-header {
     position: absolute;
     z-index: 1001;
@@ -140,9 +218,8 @@ export default defineComponent({
     font-size: 12px;
 }
 .page {
-    position: absolute;
-    left: 200px;
-    width: calc(100% - 200px);
+    overflow: hidden;
+    flex-grow: 1;
     height: 100%;
     background-color: #fff;
 }

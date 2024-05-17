@@ -26,6 +26,7 @@ body {
 	margin: 0;
 }
 #app {
+    overflow: hidden;
 	font-family: Avenir, Helvetica, Arial, sans-serif;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
@@ -34,5 +35,8 @@ body {
 	display: flex;
     margin: 0;
 	flex-direction: row;
+}
+#app .page {
+    left: 60px;
 }
 </style>

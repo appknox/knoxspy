@@ -8,6 +8,7 @@ import REPLManager from './repl';
 var wss: Server;
 var dbManager = new DBManager('./data.db');
 var devices: Session[] = [];
+var currentAppSession: number = -1
 
 class WebSocketClient {
     ws: WebSocket
@@ -40,27 +41,41 @@ class WebSocketClient {
         if(Object.keys(jsonData).indexOf("action") === -1) {
             console.log("Action is missing");
         } else {
+            const devices = await findDevices();
             switch (jsonData['action']) {
                 case 'devices':
-                    const devices = await findDevices();
                     this.send(JSON.stringify({"action":"devices", "devices":devices}))
                     break;
                 case 'apps':
                     const deviceId = jsonData['deviceId']
-                    const apps = await findApps(deviceId);
-                    this.send(JSON.stringify({"action":"apps", "apps":apps}))
+                    console.log(devices);
+                    console.log(deviceId);
+                    if(devices.map((item) => item.id == deviceId).length > 0) {
+                        const apps = await findApps(deviceId);
+                        this.send(JSON.stringify({"action":"apps", "apps":apps}))
+                    } else {
+                        this.send(JSON.stringify({"action":"error", "message":"Device is not connected!"}))
+                    }
                     break;
                 case 'startApp':
                     const deviceId1 = jsonData['deviceId']
-                    const appId = jsonData['appId']
-                    const appName = jsonData['appName']
-                    console.log("About to start " + appId + " app...");
-                    const session = await startApp(deviceId1, appId);
-                    const channel = new Channels(session, appName);
-                    channel.connect()
-                    const repl = new REPLManager(session);
-                    const code = "send('pokeBack');";
-                    repl.run_script(code)
+                    // console.log(devices);
+                    // console.log(deviceId1);
+                    
+                    if(devices.map((item) => item.id == deviceId1).length > 0) {
+                        const appId = jsonData['appId']
+                        const appName = jsonData['appName']
+                        const sessionId = jsonData['sessionId'];
+                        const library = jsonData['library'];
+                        console.log("About to start " + appId + " app...with session id:" + sessionId);
+                        const session = await startApp(deviceId1, appId);
+                        const channel = new Channels(session, appName, sessionId);
+                        channel.connect()
+                        const repl = new REPLManager(session, sessionId);
+                        repl.run_script(library)
+                    } else {
+                        this.send(JSON.stringify({"action":"error", "message":"Device is not connected!"}))
+                    }
                     // this.send(JSON.stringify({"action":"startApp"}))
                     break;
                 case 'deviceUpdate':
@@ -71,6 +86,10 @@ class WebSocketClient {
                     break;
                 case 'trafficUpdate':
                     this.manager.broadcastData(JSON.stringify(jsonData))
+                case 'library':
+                    dbManager.getLibraries((row) => {
+                        this.ws.send(JSON.stringify({'action':'library', 'message':row}))
+                    })
                 default:
                     break;
             }
@@ -89,8 +108,6 @@ class WebSocketManager {
     constructor(server: any) {
         this.wss = new WebSocket.Server({ server: server });
         this.wss.on("connection", (ws: WebSocket) => {
-            console.log("New client");
-
             const client = new WebSocketClient(ws, this)
         })
     }

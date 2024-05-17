@@ -25,12 +25,18 @@
     "@progress/kendo-vue-popup": "^4.3.3",
     "@revolist/vue-datagrid": "^4.7.0-next.2",
     "@revolist/vue3-datagrid": "^4.0.0-next.1",
+    "@wdns/vue-code-block": "^2.3.2",
+    "highlightjs": "^9.16.2",
     "primeicons": "^7.0.0",
     "primevue": "^3.52.0",
+    "prismjs": "^1.29.0",
     "vue": "^3.4.21",
-    "vue-router": "^4.3.2"
+    "vue-code-highlight": "^0.7.8",
+    "vue-router": "^4.3.2",
+    "vue3-shortkey": "^4.0.0"
   },
   "devDependencies": {
+    "@types/prismjs": "^1.26.4",
     "@vitejs/plugin-vue": "^5.0.4",
     "typescript": "^5.2.2",
     "vite": "^5.2.0",
