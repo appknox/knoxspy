@@ -24,6 +24,40 @@ class REPLManager {
         this.db = new DBManager('./data.db');
     }
 
+    
+    async detect_libraries() {
+        console.log("Got request for executing code");
+        const parentDir = path.join(__dirname, '..')
+        const filePath = parentDir + '/agents/library_detector.js'; 
+        const fileContent = readFileSync(filePath, 'utf8');
+
+        const script = await this.session.createScript(fileContent)
+
+        script.message.connect((message, data) => {
+            console.log("Script Message: " + message.type);
+            if(message.type === MessageType.Error) {
+                const { columnNumber, description, fileName, lineNumber, stack } = message
+                console.log(columnNumber, description, fileName, lineNumber, stack);
+                this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": description, "fileName": fileName, "stack": stack, "line": lineNumber, "column": columnNumber}}))
+            } else {
+                const { payload } = message
+                console.log(payload);
+                var tmpJson = JSON.parse(payload);
+                if(Object.keys(tmpJson).indexOf("error") > -1) {
+                    this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": tmpJson['error']}}))
+                } else {
+                    this.ws.send(JSON.stringify({'action':'scriptOutput', 'message':tmpJson}))
+                }
+            }
+            console.log(data); 
+        });
+
+        script.destroyed.connect(() => {
+            console.log("Script destroyed");            
+        })
+
+        await script.load()
+    }
 
 
     async run_script(code: string) {
@@ -39,23 +73,28 @@ class REPLManager {
             if(message.type === MessageType.Error) {
                 const { columnNumber, description, fileName, lineNumber, stack } = message
                 console.log(columnNumber, description, fileName, lineNumber, stack);
+                this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": description, "fileName": fileName, "stack": stack, "line": lineNumber, "column": columnNumber}}))
             } else {
                 const { payload } = message
                 console.log(payload);
                 var tmpJson = JSON.parse(payload);
-                // tmpJson['request_headers'] = JSON.stringify(tmpJson['request_headers']);
-                // tmpJson['response_headers'] = JSON.stringify(tmpJson['response_headers']);
-                // tmpJson['response_body'] = JSON.stringify(tmpJson['response_body']);
-                this.db.writeToTable(JSON.parse(payload), (lastId) => {
-                    if(lastId != -1) {
-                        this.db.getRowFromDatabase(lastId, (row) => {
-                            this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(row)}))
-                        })
-                    }
-                })
-                // this.db.getDataFromDatabase((data) => {
-                //     this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(data)}))
-                // })
+                if(Object.keys(tmpJson).indexOf("error") > -1) {
+                    this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": tmpJson['error']}}))
+                } else {
+                    // tmpJson['request_headers'] = JSON.stringify(tmpJson['request_headers']);
+                    // tmpJson['response_headers'] = JSON.stringify(tmpJson['response_headers']);
+                    // tmpJson['response_body'] = JSON.stringify(tmpJson['response_body']);
+                    this.db.writeToTable(JSON.parse(payload), (lastId) => {
+                        if(lastId != -1) {
+                            this.db.getRowFromDatabase(lastId, (row) => {
+                                this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(row)}))
+                            })
+                        }
+                    })
+                    // this.db.getDataFromDatabase((data) => {
+                    //     this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(data)}))
+                    // })
+                }
             }
             console.log(data);
             

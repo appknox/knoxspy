@@ -1,5 +1,5 @@
 <template>
-	<div class="page">
+	<div class="page page-library-manager">
         <h1>Library Manager</h1>
         <TabView style="width: 1000px; margin: 0 auto;">
             <TabPanel>
@@ -274,6 +274,8 @@ export default defineComponent({
 	height: 100%;
 	background-color: #222831;
     background-color: #fff;
+}
+.page-library-manager {
     padding: 30px;
 }
 .page h1 {

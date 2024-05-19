@@ -24,7 +24,7 @@
             </SplitterPanel>
             <SplitterPanel :size="40">
                 <Splitter class="history-viewer-split">
-                    <SplitterPanel class="flex align-items-center justify-content-center" :size="50">
+                    <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
                         <VCodeBlock
                             :code="requestContent"
                             highlightjs
@@ -33,7 +33,7 @@
                             style="text-align: left;"
                         />
                     </SplitterPanel>
-                    <SplitterPanel class="flex align-items-center justify-content-center" :size="50">
+                    <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
                         <VCodeBlock
                             :code="responseContent"
                             highlightjs

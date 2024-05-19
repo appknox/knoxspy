@@ -13,8 +13,8 @@
             <p class="app-message" type="connected">{{connectionStatus}}<span>{{ connectionAppName }}</span></p>
             <div class="app-info-button-group-wrapper">
                 <div class="app-info-button-group">
-                    <Button icon="pi pi-refresh" style="margin-right: 10px;" severity="success" rounded text />
-                    <Button icon="pi pi-times" severity="danger" rounded text/>
+                    <Button icon="pi pi-refresh" @click="restartApp" style="margin-right: 10px;" severity="success" rounded text />
+                    <Button icon="pi pi-times" disabled severity="danger" rounded text/>
                 </div>
             </div>
         </div>
@@ -52,6 +52,18 @@ export default defineComponent({
             
             this.isActive = !this.isActive;
         },
+        restartApp() {
+            const appId = localStorage.getItem("appId")
+            const appName = localStorage.getItem("appName")
+            const library = localStorage.getItem("library")
+            const deviceId = localStorage.getItem("deviceId")
+            const sessionId = Math.floor(Math.random() * 100000);
+            const tmpLibrary = library !== 'null' ? library : null
+            this.connectionSessionId = sessionId
+            localStorage.setItem("sessionId", ""+sessionId)
+            const json = {"action":"startApp", "deviceId": deviceId, "appId": appId, 'appName': appName, 'sessionId': sessionId, 'library': tmpLibrary}
+            this.ws.send(JSON.stringify(json))
+        }
     },
     created() {
         const url = 'ws://192.168.29.203:8000';
@@ -65,16 +77,39 @@ export default defineComponent({
         this.ws.onmessage = (event: { data: string; }) => {
             const message = JSON.parse(event.data);
             if(message['action'] === 'deviceUpdate') {
-                if(message['message'] == "Connected") {
-                    this.connectionSessionId = message['sessionId'];
-                    this.connectionStatus = message['message']
+                this.connectionSessionId = parseInt(localStorage.getItem("sessionId"))
+                const tmpSessionId = message['sessionId']
+                if(tmpSessionId === this.connectionSessionId) {
                     this.connectionAppName = `(${message['appName']})`
-                } else {
-                    if(message['sessionId'] == this.connectionSessionId) {
-                        this.connectionStatus = message['message']
-                        this.connectionAppName = `(${message['appName']})`
+                    this.connectionStatus = message['message']
+                    if(message['message'] === "Connected") {
+                        this.isConnected = true;
+                        localStorage.setItem("appId", message["appId"])
+                        localStorage.setItem("appName", message["appName"])
+                        localStorage.setItem("library", message["library"])
+                        localStorage.setItem("deviceId", message["deviceId"])
+                    } else {
+                    this.connectionAppName = ``
+                        this.isConnected = false;
+                        localStorage.setItem("appId", "")
+                        localStorage.setItem("appName", "")
+                        localStorage.setItem("library", "")
+                        localStorage.setItem("deviceId", "")
                     }
+                } else {
+                    console.log("Old Session Got Disconnected: " + tmpSessionId + " | Current Session Id: " + this.connectionSessionId);  
                 }
+
+                // if(message['message'] == "Connected") {
+                //     this.connectionSessionId = message['sessionId'];
+                //     this.connectionStatus = message['message']
+                //     this.connectionAppName = `(${message['appName']})`
+                // } else {
+                //     if(message['sessionId'] == this.connectionSessionId) {
+                //         this.connectionStatus = message['message']
+                //         this.connectionAppName = `(${message['appName']})`
+                //     }
+                // }
             }
         };
 
@@ -104,7 +139,13 @@ export default defineComponent({
     margin-bottom: 20px;
 }
 .app-info .app-message {
+    display: flex;
+    flex-direction: column;
     color: #aaa;
+    height: 55px !important;
+    margin-left: -55px !important;
+    margin-bottom: 80px !important;
+    justify-content: center;
 }
 .app-info .app-message span {
     color: red;
@@ -148,7 +189,7 @@ export default defineComponent({
         margin-bottom: 40px;
         transform: rotateZ(-90deg);
         width: 160px;
-        margin-left: -55px;
+        margin-left: -58px;
         margin-top: 50px;
     }
 }

@@ -1,22 +1,42 @@
 <template>
 	<div class="page">
+        <Toast />
+
         <div class="section-group">
             <div class="section section-apps">
                 <div class="section-header">
                     <div class="section-header-device">
                         <h4>Apps For</h4>
                         <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" />
+                    
+                        <div class="section-header-search">
+                            <IconField iconPosition="left">
+                                <InputIcon class="pi pi-search"> </InputIcon>
+                                <InputText v-model="appSearch" placeholder="Search Apps" :onKeydown="searchApp" />
+                            </IconField>
+                        </div>
                     </div>
-                    <AutoComplete v-model="selectedLibrary" optionLabel="name" :suggestions="filteredLibraryList" @complete="search" />
-
-                    <div class="section-header-search">
-                        <IconField iconPosition="left">
-                            <InputIcon class="pi pi-search"> </InputIcon>
-                            <InputText v-model="appSearch" placeholder="Search" :onKeydown="searchApp" />
-                        </IconField>
+                    <div style="display: flex; gap: 5px; position: relative;">
+                        <Dropdown style="display: flex; " v-model="selectedLibrary" :options="libraryList" optionLabel="name" placeholder="Select a Library" class="w-full md:w-14rem">
+                            <template #value="slotProps">
+                                <div v-if="slotProps.value" class="flex align-items-center">
+                                    <div v-if="slotProps.value.platform === 'iOS'"><i class="pi pi-apple"></i> {{ slotProps.value.name }}</div>
+                                    <div v-else><i class="pi pi-android"></i> {{ slotProps.value.name }}</div>
+                                </div>
+                                <span v-else>
+                                    {{ slotProps.placeholder }}
+                                </span>
+                            </template>
+                            <template #option="slotProps">
+                                <div class="flex align-items-center">
+                                    <div v-if="slotProps.option.platform === 'iOS'"><i class="pi pi-apple"></i> {{ slotProps.option.name }}</div>
+                                    <div v-else><i class="pi pi-android"></i> {{ slotProps.option.name }}</div>
+                                </div>
+                            </template>
+                        </Dropdown>
                     </div>
                 </div>
-                <ul v-if="data">
+                <ul class="app-list" v-if="data">
                     <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.identifier, item.name)">
                         <img :src="item.icon">
                         <p>{{ item.name }}</p>
@@ -28,7 +48,47 @@
                             <i class="pi pi-info-circle" style="font-size: 35px; margin-bottom: 20px"></i>
                             <p class="m-0">
                                 Connected to <t style="display: block;">'{{ connectionAppName }}'</t> App!
-                                <span style="display: block"><router-link to="/traffic">Switch to HTTP Traffic tab</router-link></span>
+                                <!-- <AutoComplete style="display: block;" v-model="selectedLibrary" optionLabel="name" :suggestions="filteredLibraryList" @complete="search" /> -->
+                                
+                                <div style="display: flex; justify-content: center; align-items: center; gap: 10px" class="auto-detect-library-wrapper">
+                                    <Dropdown @change="setLibrary" style="display: flex; " v-model="selectedLibrary" :options="libraryList" optionLabel="name" placeholder="Select a Library" class="w-full md:w-14rem">
+                                        <template #value="slotProps">
+                                            <div v-if="slotProps.value" class="flex align-items-center">
+                                                <div v-if="slotProps.value.platform === 'iOS'"><i class="pi pi-apple"></i> {{ slotProps.value.name }}</div>
+                                                <div v-else><i class="pi pi-android"></i> {{ slotProps.value.name }}</div>
+                                            </div>
+                                            <span v-else>
+                                                {{ slotProps.placeholder }}
+                                            </span>
+                                        </template>
+                                        <template #option="slotProps">
+                                            <div class="flex align-items-center">
+                                                <div v-if="slotProps.option.platform === 'iOS'"><i class="pi pi-apple"></i> {{ slotProps.option.name }}</div>
+                                                <div v-else><i class="pi pi-android"></i> {{ slotProps.option.name }}</div>
+                                            </div>
+                                        </template>
+                                    </Dropdown>
+                                    <Button label="Auto-Detect" icon="pi pi-refresh" @click="toggleAutoDetectOverlay" />
+                                    <div class="overlay-auto-detect" v-if="libraryDetectionPopup">
+                                        <div class="flex flex-column gap-3 w-25rem">
+                                            <div>
+                                                <span class="font-medium text-900 block mb-2">Detected Libraries:</span>
+                                                <ul class="list-none p-0 m-0 flex flex-row gap-3">
+                                                        <div v-if="!librariesDetected">
+                                                            <i class="pi pi-spin pi-spinner" style="color: var(--primary-color)"></i>
+                                                        </div>
+                                                    <li v-else v-for="member in librariesFound" :key="member.name" class="flex align-items-center gap-2">
+                                                        <div v-if="member.status === true">
+                                                            <div style="display: flex; align-items: center; gap: 5px" v-if="member.platform === 'iOS'"><i class="pi pi-apple"></i> <span class="font-medium">{{ member.name }}</span></div>
+                                                            <div style="display: flex; align-items: center; gap: 5px" v-else><i class="pi pi-android"></i> <span class="font-medium">{{ member.name }}</span></div>
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span :v-if="selectedLibrary !== null && selectedLibrary !== ''" style="display: block; margin-top: 10px"><router-link to="/traffic">Switch to HTTP Traffic tab</router-link></span>
                             </p>
                         </template>
                     </Card>
@@ -47,6 +107,9 @@ import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import Card from "primevue/card";
 import AutoComplete from "primevue/autocomplete";
+import Toast from 'primevue/toast';
+import Button from "primevue/button";
+
 
 export default defineComponent({
 	name: 'DashboardPage',
@@ -57,11 +120,16 @@ export default defineComponent({
         InputIcon,
         IconField,
         Card,
-        AutoComplete
+        AutoComplete,
+        Toast,
+        Button
     },
     data() {
         return {
-            selectedDevice: "2d2dfbf",
+            librariesDetected: false,
+            librariesFound: [],
+            libraryDetectionPopup: false,
+            selectedDevice: null,
             selectedApp: "",
             data: [],
             apps: null,
@@ -73,7 +141,7 @@ export default defineComponent({
             appSearch: null,
             connectionAppName: "",
             connectionSessionId: -1,
-            libraryList: [{name:'AFNetworking', file:'afnetworking.js'}, {name:'TrustKit', file:'trustkit.js'}, {name:'AlamoFile', file:'alamofire.js'}, {name:'OkHTTP', file:'okhttp.js'}],
+            libraryList: [{name:'AFNetworking', file:'afnetworking.js', platform: 'iOS'}, {name:'TrustKit', file:'trustkit.js', platform: 'iOS'}, {name:'AlamoFire', file:'alamofire.js', platform: 'iOS'}, {name:'OkHTTP', file:'okhttp.js', platform: 'android'}],
             filteredLibraryList: [],
             selectedLibrary: null
         }
@@ -115,6 +183,7 @@ export default defineComponent({
                     this.data.push({"name": b.name, "value": b.id});
                 }
                 if(this.data.length == 1) {
+                    this.selectedDevice = message['devices'][0].id
                     this.fetchApps()
                 }
             } else if(message['action'] === 'apps') {
@@ -122,18 +191,33 @@ export default defineComponent({
             } else if(message['action'] === 'startApp') {
                 this.visibleDialog = true;
             } else if(message['action'] === 'deviceUpdate') {
+                this.connectionSessionId = parseInt(localStorage.getItem("sessionId"))
                 const tmpSessionId = message['sessionId']
                 if(tmpSessionId === this.connectionSessionId) {
                     this.connectionAppName = `(${message['appName']})`
                     if(message['message'] === "Connected") {
                         this.isConnected = true;
+                        localStorage.setItem("appId", message["appId"])
+                        localStorage.setItem("appName", message["appName"])
+                        localStorage.setItem("library", message["library"])
+                        this.ws.send(JSON.stringify({'action': 'detectLibraries', 'sessionId': this.connectionSessionId}))
                     } else {
+                        this.connectionAppName = ``
                         this.isConnected = false;
+                        localStorage.setItem("appId", "")
+                        localStorage.setItem("appName", "")
+                        localStorage.setItem("library", "")
                     }
                 } else {
-                    console.log("Got info for an old app i think" + tmpSessionId);
-                    
+                    console.log("Old Session Got Disconnected: " + tmpSessionId + " | Current Session Id: " + this.connectionSessionId);  
                 }
+            } else if (message['action'] == "scriptError") {
+                this.showSticky(message['message']['description'])
+                console.log("got an error from script");
+            } else if(message['action'] == 'scriptOutput') {
+                const libraryStatus = message['message'];
+                this.librariesFound = libraryStatus
+                this.librariesDetected = true
             }
         };
 
@@ -147,6 +231,17 @@ export default defineComponent({
         };
     },
     methods: {
+        setLibrary() {
+            if(this.isConnected) {
+                this.ws.send(JSON.stringify({'action': 'changeLibrary', 'library': this.selectedLibrary, 'sessionId': this.connectionSessionId}))
+            }
+        },
+        toggleAutoDetectOverlay() {
+            this.libraryDetectionPopup = !this.libraryDetectionPopup
+        },
+        showSticky(message: String) {
+            this.$toast.add({ severity: 'error', summary: 'Script Error', detail: message});
+        },
         async fetchApps() {
             console.log(this.selectedDevice);
             const json = {"action":"apps", "deviceId": this.selectedDevice}
@@ -157,7 +252,9 @@ export default defineComponent({
             console.log(this.selectedDevice);
             const sessionId = Math.floor(Math.random() * 100000);
             this.connectionSessionId = sessionId
-            const json = {"action":"startApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': this.selectedLibrary.file}
+            localStorage.setItem("sessionId", ""+sessionId)
+            const library = this.selectedLibrary !== null ? this.selectedLibrary.file : null
+            const json = {"action":"startApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
             this.ws.send(JSON.stringify(json))
         },
         searchApp() {
@@ -178,7 +275,77 @@ export default defineComponent({
 });
 </script>
 
+
 <style>
+.auto-detect-library-wrapper {
+    position: relative;
+    margin-top: 10px;
+}
+.auto-detect-library-wrapper button span {
+    font-size: 13px !important;
+}
+.auto-detect-library-wrapper span {
+    color: #fff !important;
+    margin:  0;
+    margin-top: 0 !important;
+}
+.auto-detect-library-wrapper .p-dropdown span {
+    color: #333 !important;
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 13px !important;
+}
+.auto-detect-library-wrapper span:first-of-type {
+    margin-right: 5px;
+}
+.overlay-auto-detect {
+    position: absolute;
+    right: 0;
+    top: 0;
+    top: 60px;
+    padding: 20px;
+    border-radius: 10px;
+    background-color: #212631;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+.overlay-auto-detect  div span.font-medium.block {
+    color: #aaa !important;
+    font-variant: small-caps;
+    border-bottom: 1px solid #aaaa;
+    margin-bottom: 10px;
+    display: block;
+}
+.overlay-auto-detect ul li {
+    padding: 0 !important;
+}
+.overlay-auto-detect ul li span {
+    color: #ddd;
+    font-variant: normal;
+    font-size: 18px;
+    text-align: left;
+    padding: 3px !important;
+    display: block;
+    background-color: #222831aa !important;
+    transition: all ease-in-out .2s;
+}
+
+.overlay-auto-detect ul li span:hover {
+    color: var(--primary-color);
+}
+.overlay-auto-detect ul li div i {
+    color: #fff;
+}
+.overlay-auto-detect ul {
+    height: unset !important;
+    overflow: hidden !important;
+    display: unset !important;
+}
+.p-dropdown > .p-dropdown-label {
+    display: block;
+    width: 100%;
+    margin: 0;
+}
 .appPopupWrapper {
     background-color: #000a;
     position: absolute;
@@ -260,7 +427,7 @@ export default defineComponent({
     /* padding: 15px; */
 }
 .section-devices li:hover {
-    background-color: #fffa
+    background-color: #fffa;
 }
 .section-header {
     flex-wrap: wrap;
@@ -286,7 +453,7 @@ export default defineComponent({
 .section-apps {
     height: 100vh;
 }
-.section-apps ul {
+.section-apps ul.app-list {
     height: calc(100vh - 110px);
     overflow-y: scroll;
     overflow-x: hidden;
@@ -298,32 +465,32 @@ export default defineComponent({
     grid-template-columns: repeat(auto-fit, 20%);
 }
 @media only screen and (min-width: 1500px) {
-    .section-apps ul {
+    .section-apps ul.app-list {
         grid-template-columns: repeat(auto-fit, 16.6667%);
         grid-template-columns: repeat(auto-fit, 14.2857142857%);
     }
 }
 @media only screen and (max-width: 1000px) {
-    .section-apps ul {
+    .section-apps ul.app-list {
         grid-template-columns: repeat(auto-fit, 25%);
     }
 }
 @media only screen and (max-width: 700px) {
-    .section-apps ul {
+    .section-apps ul.app-list {
         grid-template-columns: repeat(auto-fit, 33.3333%);
     }
 }
 @media only screen and (max-width: 500px) {
-    .section-apps ul {
+    .section-apps ul.app-list {
         grid-template-columns: repeat(auto-fit, 50%);
     }
 }
-.section-apps li {
+.section-apps .app-list li {
     align-content: center;
     border-radius: 10px;
     transition: all linear .4s;
 }
-.section-apps li:hover {
+.section-apps .app-list li:hover {
     box-shadow: 0px 0px 15px -5px #0005;
     background-color: #0001;
     background-color: #2222;
