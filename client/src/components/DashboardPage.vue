@@ -69,7 +69,7 @@
                                         </template>
                                     </Dropdown>
                                     <Button label="Auto-Detect" icon="pi pi-refresh" @click="toggleAutoDetectOverlay" />
-                                    <div class="overlay-auto-detect" v-if="libraryDetectionPopup">
+                                    <div class="overlay-auto-detrefdect" v-if="libraryDetectionPopup">
                                         <div class="flex flex-column gap-3 w-25rem">
                                             <div>
                                                 <span class="font-medium text-900 block mb-2">Detected Libraries:</span>
@@ -88,7 +88,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <span :v-if="selectedLibrary !== null && selectedLibrary !== ''" style="display: block; margin-top: 10px"><router-link to="/traffic">Switch to HTTP Traffic tab</router-link></span>
+                                <span v-if="selectedLibrary != null" style="display: block; margin-top: 10px"><router-link to="/traffic">Switch to HTTP Traffic tab</router-link></span>
                             </p>
                         </template>
                     </Card>
@@ -177,7 +177,13 @@ export default defineComponent({
 
         this.ws.onmessage = (event: { data: string; }) => {
             const message = JSON.parse(event.data);
+            console.log("New Message");
+            console.log(message);
+            
+            
             if(message['action'] === 'devices') {
+                console.log(message);
+                
                 for(const a in message['devices']) {
                     const b = message['devices'][a];
                     this.data.push({"name": b.name, "value": b.id});
@@ -212,9 +218,15 @@ export default defineComponent({
                     console.log("Old Session Got Disconnected: " + tmpSessionId + " | Current Session Id: " + this.connectionSessionId);  
                 }
             } else if (message['action'] == "scriptError") {
-                this.showSticky(message['message']['description'])
+                this.showSticky(message['message']['description'], 'Script Error', 'error')
                 console.log("got an error from script");
-            } else if(message['action'] == 'scriptOutput') {
+            } else if (message['action'] == "error") {
+                this.showSticky(message['message'], 'Error', 'error')
+                console.log("got an error from script");
+            } else if (message['action'] == 'successOutput') {
+                this.showSticky(message['message'], 'Success', 'success')
+                console.log("got an output from server");
+            }else if(message['action'] == 'scriptOutput') {
                 const libraryStatus = message['message'];
                 this.librariesFound = libraryStatus
                 this.librariesDetected = true
@@ -239,8 +251,8 @@ export default defineComponent({
         toggleAutoDetectOverlay() {
             this.libraryDetectionPopup = !this.libraryDetectionPopup
         },
-        showSticky(message: String) {
-            this.$toast.add({ severity: 'error', summary: 'Script Error', detail: message});
+        showSticky(message: String, header: String, type: String) {
+            this.$toast.add({ severity: type, summary: header, detail: message});
         },
         async fetchApps() {
             console.log(this.selectedDevice);

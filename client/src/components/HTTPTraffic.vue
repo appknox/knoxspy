@@ -4,7 +4,8 @@
         
         <Splitter style="height: 100vh" layout="vertical">
             <SplitterPanel class="flex align-items-center justify-content-center" :size="60">
-                <DataTable selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
+                <ContextMenu ref="cm" :model="menuModel" @hide="selectedRow = null" />
+                <DataTable contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
                     <template #header :style="{'margin':0, 'padding':0}" class="traffic-header" :class="{'hidden': visibleTrafficHeader}">
                         <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: space-between;" :style="{'display': visibleTrafficHeader ? 'flex': 'none'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
                             <Button type="button" icon="pi pi-filter-slash" label="Clear" outlined @click="" />
@@ -26,20 +27,22 @@
                 <Splitter class="history-viewer-split">
                     <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
                         <VCodeBlock
+                            class="history-viewer-split-code"
                             :code="requestContent"
                             highlightjs
                             lang="http"
                             theme="vs"
-                            style="text-align: left;"
+                            style="text-align: left; word-wrap: break-word; text-wrap: wrap"
                         />
                     </SplitterPanel>
                     <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
                         <VCodeBlock
+                            class="history-viewer-split-code"
                             :code="responseContent"
                             highlightjs
                             lang="http"
                             theme="atom-one-light"
-                            style="text-align: left;"
+                            style="text-align: left; word-wrap: break-word; text-wrap: wrap"
                         />
                     </SplitterPanel>
                 </Splitter>
@@ -50,7 +53,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, ref } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
@@ -67,7 +70,7 @@ import { VCodeBlock } from '@wdns/vue-code-block';
 // import 'prismjs/components/prism-http';
 import HighlightJS from 'highlightjs';
 import "highlightjs/styles/vs.css";
-
+import ContextMenu from 'primevue/contextmenu';
 
 
 export default defineComponent({
@@ -95,6 +98,11 @@ export default defineComponent({
             requestContent: "",
             responseContent: "",
             visibleTrafficHeader: false,
+            selectedRow: null,
+            menuModel: [
+                {label: 'View', icon: 'pi pi-fw pi-search', command: () => this.viewProduct(this.selectedRow)},
+                {label: 'Delete', icon: 'pi pi-fw pi-times', command: () => this.deleteProduct(this.selectedRow)}
+            ]
         };
     },
     components: {
@@ -146,12 +154,19 @@ export default defineComponent({
         };
     },
     methods: {
+        onRowContextMenu(event: any) {
+            console.log(this.$refs.cm);
+            
+            this.$refs.cm.show(event.originalEvent);
+        },
         toggleTrafficHeader() {
             this.visibleTrafficHeader = !this.visibleTrafficHeader
         },
         onRequestSelect(event: any) {
             var tmpData = event.data.method + " " + event.data.endpoint + "\n"
             tmpData += JSON.parse(event.data.request_headers).join("\n")
+            console.log(event.data);
+            console.log(event.data.request_body  );
             if(event.data.request_body) {
                 tmpData += "\n\n" + event.data.request_body
             } else {
@@ -195,9 +210,26 @@ export default defineComponent({
 
 
 <style scoped>
-.p-datatable .p-datatable-header {
+.p-datatable:first-child{
+    background-color: red;
+    padding: 0
+    ;
+}
+.p-datatable div.p-datatable-header {
     padding: 0 !important;
     margin: 0;
+}
+.history-viewer-split .history-viewer-split-code {
+    word-wrap: break-word;
+    text-wrap: wrap;
+    font-size: 13px !important;
+    overflow: hidden;
+}
+.history-viewer-split > div {
+    font-size: 13px;
+}
+.history-viewer-split {
+    width: 100vh;
 }
 .history-viewer-split pre {
     text-align: left;

@@ -87,32 +87,45 @@ export async function findDevices() {
 }
 
 export async function findApps(deviceId: string) {
-    const mgr = frida.getDeviceManager()
-    const devices = await mgr.enumerateDevices();
-    const filtered = devices.filter(dev => deviceId == dev.id);
-    const device = filtered[0];
-    const applications = await device.enumerateApplications({ scope: Scope.Full });
+    // console.log("Findings apps");
+    var error = null;
     const filteredApplications = [];
-    for(const app in applications) {
-        const appInfo = applications[app];
-        const params = applications[app].parameters;
-        if (params.icons?.length) {
-            if(params.icons[0].format === "png") {
-                const tmpPng = bytesToImageURI(params.icons[0].image)
-                var appsDetails = {}
-                if(tmpPng === defaultPng) {
-                    appsDetails = {"icon": bytesToImageURI(params.icons[0].image), "identifier": appInfo.identifier, "name": appInfo.name, "type":"system_dev"}
-                } else {
-                    appsDetails = {"icon": bytesToImageURI(params.icons[0].image), "identifier": appInfo.identifier, "name": appInfo.name, "type":"user"}
+    try {
+        const mgr = frida.getDeviceManager()
+        const devices = await mgr.enumerateDevices();
+        const filtered = devices.filter(dev => deviceId == dev.id);
+        
+        // console.log(filtered);
+        // console.log(devices);
+        
+        const device = filtered[0];
+        const applications = await device.enumerateApplications({ scope: Scope.Full });
+        for(const app in applications) {
+            const appInfo = applications[app];
+            const params = applications[app].parameters;
+            if (params.icons?.length) {
+                if(params.icons[0].format === "png") {
+                    const tmpPng = bytesToImageURI(params.icons[0].image)
+                    var appsDetails = {}
+                    if(tmpPng === defaultPng) {
+                        appsDetails = {"icon": bytesToImageURI(params.icons[0].image), "identifier": appInfo.identifier, "name": appInfo.name, "type":"system_dev"}
+                    } else {
+                        appsDetails = {"icon": bytesToImageURI(params.icons[0].image), "identifier": appInfo.identifier, "name": appInfo.name, "type":"user"}
+                    }
+                    // console.log(appsDetails);
+                    
+                    filteredApplications.push(appsDetails);
                 }
-                // console.log(appsDetails);
-                
-                filteredApplications.push(appsDetails);
             }
         }
+        filteredApplications.sort(compareByType)
+    } catch (e: any) {
+        console.log((e as Error).message);
+        console.log(Object.keys(e));
+        
+        error = (e as Error).message;
     }
-    filteredApplications.sort(compareByType)
-    return filteredApplications;
+    return [filteredApplications, error];
 }
 function compareByType(a: any, b: any) {
     // 'user' comes before 'system_dev'

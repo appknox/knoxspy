@@ -1,6 +1,6 @@
 import { Session, Script } from "frida";
 import { MessageType } from "frida/dist/script";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { WebSocket } from "ws";
 import DBManager from "./database";
@@ -64,48 +64,54 @@ class REPLManager {
         console.log("Got request for executing code");
         const parentDir = path.join(__dirname, '..')
         const filePath = parentDir + '/libraries/' + code; 
-        const fileContent = readFileSync(filePath, 'utf8');
-
-        const script = await this.session.createScript(fileContent)
-
-        script.message.connect((message, data) => {
-            console.log("Script Message: " + message.type);
-            if(message.type === MessageType.Error) {
-                const { columnNumber, description, fileName, lineNumber, stack } = message
-                console.log(columnNumber, description, fileName, lineNumber, stack);
-                this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": description, "fileName": fileName, "stack": stack, "line": lineNumber, "column": columnNumber}}))
-            } else {
-                const { payload } = message
-                console.log(payload);
-                var tmpJson = JSON.parse(payload);
-                if(Object.keys(tmpJson).indexOf("error") > -1) {
-                    this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": tmpJson['error']}}))
+        if (existsSync(filePath)) {
+            const fileContent = readFileSync(filePath, 'utf8');
+            const script = await this.session.createScript(fileContent)
+            script.message.connect((message, data) => {
+                console.log("Script Message: " + message.type);
+                if(message.type === MessageType.Error) {
+                    const { columnNumber, description, fileName, lineNumber, stack } = message
+                    console.log(columnNumber, description, fileName, lineNumber, stack);
+                    this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": description, "fileName": fileName, "stack": stack, "line": lineNumber, "column": columnNumber}}))
                 } else {
-                    // tmpJson['request_headers'] = JSON.stringify(tmpJson['request_headers']);
-                    // tmpJson['response_headers'] = JSON.stringify(tmpJson['response_headers']);
-                    // tmpJson['response_body'] = JSON.stringify(tmpJson['response_body']);
-                    this.db.writeToTable(JSON.parse(payload), (lastId) => {
-                        if(lastId != -1) {
-                            this.db.getRowFromDatabase(lastId, (row) => {
-                                this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(row)}))
-                            })
-                        }
-                    })
-                    // this.db.getDataFromDatabase((data) => {
-                    //     this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(data)}))
-                    // })
+                    const { payload } = message
+                    console.log(payload);
+                    var tmpJson = JSON.parse(payload);
+                    if(Object.keys(tmpJson).indexOf("error") > -1) {
+                        this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": tmpJson['error']}}))
+                    } else {
+                        // tmpJson['request_headers'] = JSON.stringify(tmpJson['request_headers']);
+                        // tmpJson['response_headers'] = JSON.stringify(tmpJson['response_headers']);
+                        // tmpJson['response_body'] = JSON.stringify(tmpJson['response_body']);
+                        this.db.writeToTable(JSON.parse(payload), (lastId) => {
+                            if(lastId != -1) {
+                                this.db.getRowFromDatabase(lastId, (row) => {
+                                    this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(row)}))
+                                })
+                            }
+                        })
+                        // this.db.getDataFromDatabase((data) => {
+                        //     this.ws.send(JSON.stringify({'action':'trafficUpdate', 'message':JSON.parse(data)}))
+                        // })
+                    }
                 }
-            }
-            console.log(data);
-            
-        })
+                console.log(data);
+                
+            })
 
-        script.destroyed.connect(() => {
-            console.log("Script destroyed");            
-        })
+            script.destroyed.connect(() => {
+                console.log("Script destroyed");            
+            })
 
 
-        await script.load()
+            await script.load()
+            this.ws.send(JSON.stringify({'action':'successOutput', 'message': `${code} library attached!`}))
+        } else {
+            setTimeout(() => {
+                console.log("File doesn't exists");            
+                this.ws.send(JSON.stringify({'action':'scriptError', 'message': {'description': `${code} library not found!`}}))
+            }, 2000);
+        }
     }
 
     // async lifecycle(sessionId: string) {

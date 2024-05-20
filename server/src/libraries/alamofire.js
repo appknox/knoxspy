@@ -44,7 +44,8 @@ if (ObjC.available) {
                     'request_headers': JSON.stringify(headersList), 
                     'status_code': 200,
                     'response_headers': JSON.stringify(['HTTP/2 200', 'Date: Wed, 15 May 2024 02:49:07 GMT', 'Content-Type: application/json', 'Content-Length: 83']),
-                    'response_body': body
+                    'request_body': body,
+                    'response_body': '{"userId": 1,"id": 1,"title": "delectus aut autem","completed": false}'
                 }
                 send(JSON.stringify(payload));
             },

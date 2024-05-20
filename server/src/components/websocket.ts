@@ -72,16 +72,20 @@ class WebSocketClient {
                         this.send(JSON.stringify({"action":"devices", "devices":devices}))
                         break;
                     case 'apps':
-                        const deviceId = jsonData['deviceId']
-                        console.log(devices);
-                        console.log(deviceId);
-                        // console.log(devices.map((item) => item.id == deviceId).length > 0 && devices.map((item) => item.id == deviceId)[0]);
-                        
+                        const deviceId = jsonData['deviceId']                        
+                        // console.log(devices);
+                        // console.log(deviceId);
+                        // console.log(devices.map((item) => {if(item.id == deviceId){return item.id;}}))//.length > 0 && devices.map((item) => item.id == deviceId)[0]);
+                        const deviceList = devices.map((item) => {if(item.id == deviceId){return item.id;}})
                         if(!deviceId) {
                             this.send(JSON.stringify({"action":"jsonError", "message": "deviceId not provided"}))
-                        } else if(devices.map((item) => item.id == deviceId).length > 0 && devices.map((item) => item.id == deviceId)[0]) {
-                            const apps = await findApps(deviceId);
-                            this.send(JSON.stringify({"action":"apps", "apps":apps}))
+                        } else if(deviceList.length > 0 && deviceList.indexOf(deviceId) > -1) {
+                            const [apps, error] = await findApps(deviceId);
+                            if(error) {
+                                this.send(JSON.stringify({"action":"error", "message":error}))
+                            } else {
+                                this.send(JSON.stringify({"action":"apps", "apps":apps}))
+                            }
                         } else {
                             this.send(JSON.stringify({"action":"error", "message":"No such device found!"}))
                         }
@@ -122,6 +126,7 @@ class WebSocketClient {
                                 console.log(tmpSession[0]);
                                 const repl = new REPLManager(tmpSession[0]['session'], sessionId)
                                 repl.detect_libraries()
+                                
                             }
                         }
                         break;
@@ -136,10 +141,14 @@ class WebSocketClient {
                                 console.log(tmpSession1[0]);
                                 const repl = new REPLManager(tmpSession1[0]['session'], tmpSessionId)
                                 repl.run_script(tmpLibrary)
+                                console.log("changedLibrary already");
                             }
                         }
                         break;
                     case 'deviceUpdate':
+                        this.manager.broadcastData(JSON.stringify(jsonData))
+                        break;
+                    case 'successOutput':
                         this.manager.broadcastData(JSON.stringify(jsonData))
                         break;
                     case 'trafficUpdate':
