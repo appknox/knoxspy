@@ -32,7 +32,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.startApp = exports.findApps = exports.findDevices = exports.parseDevices = exports.split_by_length = exports.bytesToImageURI = void 0;
+exports.test = exports.startApp = exports.findApps = exports.findProcesses = exports.findDevices = exports.parseDevices = exports.split_by_length = exports.bytesToImageURI = void 0;
 const child = __importStar(require("child_process"));
 const frida = __importStar(require("frida"));
 const device_1 = require("frida/dist/device");
@@ -116,6 +116,25 @@ function findDevices() {
     });
 }
 exports.findDevices = findDevices;
+function findProcesses(deviceId) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const mgr = frida.getDeviceManager();
+        const devices = yield mgr.enumerateDevices();
+        const filtered = devices.filter(dev => deviceId == dev.id);
+        const device = filtered[0];
+        const processes = yield device.enumerateProcesses({ scope: device_1.Scope.Full });
+        const filteredProcesses = [];
+        for (const process in processes) {
+            const processID = processes[process].pid;
+            const appName = processes[process].name;
+            var appsDetails = {};
+            appsDetails = { "name": appName, "processID": processID };
+            filteredProcesses.push(appsDetails);
+        }
+        return filteredProcesses;
+    });
+}
+exports.findProcesses = findProcesses;
 function findApps(deviceId) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -163,16 +182,22 @@ function compareByType(a, b) {
         return 0;
     }
 }
-function startApp(deviceId, appId) {
+function startApp(deviceId, processID) {
     return __awaiter(this, void 0, void 0, function* () {
+        console.log(deviceId, processID);
         const mgr = frida.getDeviceManager();
         const devices = yield mgr.enumerateDevices();
         const filtered = devices.filter(dev => deviceId == dev.id);
         const device = filtered[0];
-        const pid = yield device.spawn(appId);
-        device.resume(pid);
-        const session = yield device.attach(pid);
+        // Changed code here for MDM
+        device.resume(processID);
+        setTimeout(test, 2000);
+        const session = yield device.attach(processID);
         return session;
     });
 }
 exports.startApp = startApp;
+function test() {
+    console.log(123);
+}
+exports.test = test;

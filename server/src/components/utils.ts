@@ -85,6 +85,24 @@ export async function findDevices() {
     return unique;
 }
 
+export async function findProcesses(deviceId: string) {
+    const mgr = frida.getDeviceManager()
+    const devices = await mgr.enumerateDevices();
+    const filtered = devices.filter(dev => deviceId == dev.id);
+    const device = filtered[0];
+    
+    const processes = await device.enumerateProcesses({ scope: Scope.Full });
+    const filteredProcesses = [];
+    for(const process in processes) {
+        const processID = processes[process].pid;
+        const appName = processes[process].name;
+        var appsDetails = {};
+        appsDetails = {"name": appName, "processID": processID}
+        filteredProcesses.push(appsDetails);
+    }
+    return filteredProcesses;
+}
+
 export async function findApps(deviceId: string) {
     var error = null;
     const filteredApplications = [];
@@ -129,13 +147,19 @@ function compareByType(a: any, b: any) {
     }
 }
 
-export async function startApp(deviceId: string, appId: string) {
+export async function startApp(deviceId: string, processID: string) {
+    console.log(deviceId,processID)
     const mgr = frida.getDeviceManager()
     const devices = await mgr.enumerateDevices();
     const filtered = devices.filter(dev => deviceId == dev.id);
     const device = filtered[0];
-    const pid = await device.spawn(appId)
-    device.resume(pid)
-    const session = await device.attach(pid)
+    // Changed code here for MDM
+    device.resume(processID)
+    setTimeout(test, 2000);
+    const session = await device.attach(processID)
     return session;
+}
+
+export function test(){
+    console.log(123);
 }

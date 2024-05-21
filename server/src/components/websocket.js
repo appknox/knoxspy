@@ -59,6 +59,23 @@ class WebSocketClient {
                         case 'devices':
                             this.send(JSON.stringify({ "action": "devices", "devices": devices }));
                             break;
+                        case 'processes':
+                            const deviceID = jsonData['deviceId'];
+                            console.log("DeviceID: ", deviceID);
+                            const devicesList = devices.map((item) => { if (item.id == deviceID) {
+                                return item.id;
+                            } });
+                            if (!deviceID) {
+                                this.send(JSON.stringify({ "action": "jsonError", "message": "deviceId not provided" }));
+                            }
+                            else if (devicesList.length > 0 && devicesList.indexOf(deviceID) > -1) {
+                                const processes = yield (0, utils_1.findProcesses)(deviceID);
+                                this.send(JSON.stringify({ "action": "processes", "processes": processes }));
+                            }
+                            else {
+                                this.send(JSON.stringify({ "action": "error", "message": "No such device found!" }));
+                            }
+                            break;
                         case 'apps':
                             const deviceId = jsonData['deviceId'];
                             // console.log(devices);
@@ -85,20 +102,19 @@ class WebSocketClient {
                             break;
                         case 'startApp':
                             const deviceId1 = jsonData['deviceId'];
-                            const tmpErrors = this.checkMissingParams(jsonData, ["appId", "appName", "sessionId", "library", "action", "deviceId"]);
+                            const tmpErrors = this.checkMissingParams(jsonData, ["processID", "appName", "sessionId", "library", "action", "deviceId"]);
                             if (tmpErrors.length) {
                                 this.send(JSON.stringify({ "action": "jsonError", "message": tmpErrors }));
                             }
                             else if (devices.map((item) => item.id == deviceId1).length > 0) {
-                                const appId = jsonData['appId'];
                                 const appName = jsonData['appName'];
                                 const sessionId = jsonData['sessionId'];
                                 const library = jsonData['library'];
-                                console.log("About to start " + appId + " app...with session id:" + sessionId);
-                                const session = yield (0, utils_1.startApp)(deviceId1, appId);
+                                const processID = jsonData['processID'];
+                                const session = yield (0, utils_1.startApp)(deviceId1, processID);
                                 this.sessions.push({ 'id': sessionId, 'session': session });
                                 console.log(this.sessions);
-                                const channel = new channels_1.default(session, appName, sessionId, appId, library, deviceId1);
+                                const channel = new channels_1.default(session, appName, sessionId, processID, library, deviceId1);
                                 channel.connect();
                                 if (library && library !== null) {
                                     const repl = new repl_1.default(session, sessionId);
