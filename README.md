@@ -1,5 +1,8 @@
 # MDM Dashboard
 
+<img width="1439" alt="image" src="https://github.com/ajay-appknox/mdm_dashboard/assets/98275091/a6c05942-be1c-4b3b-bb68-373a9a6faf57">
+
+
 ## Installation
 ```bash
 git clone https://github.com/ajay-appknox/mdm_dashboard.git
