@@ -120,7 +120,7 @@ export default defineComponent({
     },
     created() {
         // Replace with your server URL
-        const url = 'ws://192.168.29.203:8000';
+        const url = 'ws://localhost:8000';
         this.connection = new WebSocket(url);
 
         this.connection.onopen = () => {
@@ -166,9 +166,9 @@ export default defineComponent({
             var tmpData = event.data.method + " " + event.data.endpoint + "\n"
             tmpData += JSON.parse(event.data.request_headers).join("\n")
             console.log(event.data);
-            console.log(event.data.request_body  );
+            console.log(event.data.request_body);
             if(event.data.request_body) {
-                tmpData += "\n\n" + event.data.request_body
+                tmpData += "\n\n" + JSON.parse(event.data.request_body)
             } else {
                 tmpData += "\n\n " 
             }

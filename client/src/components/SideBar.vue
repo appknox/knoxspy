@@ -66,7 +66,7 @@ export default defineComponent({
         }
     },
     created() {
-        const url = 'ws://192.168.29.203:8000';
+        const url = 'ws://localhost:8000';
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {

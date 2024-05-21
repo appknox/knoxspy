@@ -5,10 +5,9 @@ import * as frida from 'frida';
 import { Scope } from 'frida/dist/device';
 
 export function bytesToImageURI(byteArray: any) {
-    const stringData = String.fromCharCode(...byteArray);
-    const base64Data = btoa(stringData);
+    const data = Buffer.from(byteArray).toString('base64')
     const mimeType = 'image/png';
-    const dataURI = `data:${mimeType};base64,${base64Data}`;
+    const dataURI = `data:${mimeType};base64,${data}`;
     return dataURI;
 }
 
@@ -87,7 +86,6 @@ export async function findDevices() {
 }
 
 export async function findApps(deviceId: string) {
-    // console.log("Findings apps");
     var error = null;
     const filteredApplications = [];
     try {
@@ -104,19 +102,11 @@ export async function findApps(deviceId: string) {
             const appInfo = applications[app];
             const params = applications[app].parameters;
             if (params.icons?.length) {
-                if(params.icons[0].format === "png") {
-                    const tmpPng = bytesToImageURI(params.icons[0].image)
-                    var appsDetails = {}
-                    if(tmpPng === defaultPng) {
-                        appsDetails = {"icon": bytesToImageURI(params.icons[0].image), "identifier": appInfo.identifier, "name": appInfo.name, "type":"system_dev"}
-                    } else {
-                        appsDetails = {"icon": bytesToImageURI(params.icons[0].image), "identifier": appInfo.identifier, "name": appInfo.name, "type":"user"}
-                    }
-                    // console.log(appsDetails);
-                    
-                    filteredApplications.push(appsDetails);
-                }
-            }
+                const imageData = bytesToImageURI(params.icons[0].image)
+                var appsDetails = {}
+                appsDetails = {"icon": imageData, "identifier": appInfo.identifier, "name": appInfo.name, "type":"user"}
+                filteredApplications.push(appsDetails);
+            }   
         }
         filteredApplications.sort(compareByType)
     } catch (e: any) {

@@ -67,6 +67,7 @@ class WebSocketClient {
                 this.send(JSON.stringify({"action":"jsonError", "message": "Action is missing"}))
             } else {
                 const devices = await findDevices();
+                console.log("Devices: ",devices);
                 switch (jsonData['action']) {
                     case 'devices':
                         this.send(JSON.stringify({"action":"devices", "devices":devices}))
@@ -74,7 +75,7 @@ class WebSocketClient {
                     case 'apps':
                         const deviceId = jsonData['deviceId']                        
                         // console.log(devices);
-                        // console.log(deviceId);
+                        //console.log(deviceId);
                         // console.log(devices.map((item) => {if(item.id == deviceId){return item.id;}}))//.length > 0 && devices.map((item) => item.id == deviceId)[0]);
                         const deviceList = devices.map((item) => {if(item.id == deviceId){return item.id;}})
                         if(!deviceId) {
