@@ -12,7 +12,7 @@ export default class Channels {
     library: string
     deviceId: string
 
-    constructor(session: frida.Session, name: string, sessionId: number, appId: string, library: string, deviceId: string) {
+    constructor(session: frida.Session, name: string, sessionId: number, appId: string, library: string, deviceId: string, processID: number = -1) {
         this.session = session
         this.name = name
         this.sessionId = sessionId

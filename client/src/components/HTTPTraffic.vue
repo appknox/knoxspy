@@ -120,7 +120,7 @@ export default defineComponent({
     },
     created() {
         // Replace with your server URL
-        const url = 'ws://localhost:8000';
+        const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.connection = new WebSocket(url);
 
         this.connection.onopen = () => {

@@ -1,6 +1,6 @@
 import {Server, WebSocketServer, WebSocket, ServerOptions } from 'ws';
 import DBManager from './database';
-import { findApps, findDevices, startApp, findProcesses } from './utils';
+import { findApps, findDevices, startApp, findProcesses, attachApp } from './utils';
 import Channels from './channels';
 import { Session } from 'frida';
 import REPLManager from './repl';
@@ -58,13 +58,13 @@ class WebSocketClient {
 
     message = async (message: string) => {
         if(!this.isValidJSON(message)) {
-            this.send(JSON.stringify({"action":"jsonError", "message": "Payload is not a valid JSON!"}))
+            this.send(JSON.stringify({"action":"jsonError", "message": ["Payload is not a valid JSON!"]}))
         } else {
             const jsonData = JSON.parse(message);
             console.log('Received message:', jsonData);
             if(Object.keys(jsonData).indexOf("action") === -1) {
                 console.log("Action is missing");
-                this.send(JSON.stringify({"action":"jsonError", "message": "Action is missing"}))
+                this.send(JSON.stringify({"action":"jsonError", "message": ["Action is missing"]}))
             } else {
                 const devices = await findDevices();
                 console.log("Devices: ",devices);
@@ -79,7 +79,7 @@ class WebSocketClient {
                             if(!deviceID) {
                                 this.send(JSON.stringify({"action":"jsonError", "message": "deviceId not provided"}))
                             } else if(devicesList.length > 0 && devicesList.indexOf(deviceID) > -1) {
-                                const processes = await findProcesses(deviceID);
+                                const processes = await findProcesses(deviceID, "");
                                 this.send(JSON.stringify({"action":"processes", "processes": processes}))
                             } else {
                                 this.send(JSON.stringify({"action":"error", "message":"No such device found!"}))
@@ -104,29 +104,65 @@ class WebSocketClient {
                             this.send(JSON.stringify({"action":"error", "message":"No such device found!"}))
                         }
                         break;
-                    case 'startApp':
+                    case 'attachApp':
                         const deviceId1 = jsonData['deviceId']
-                        const tmpErrors = this.checkMissingParams(jsonData, ["processID", "appName", "sessionId", "library", "action", "deviceId"])
+                        const tmpErrors = this.checkMissingParams(jsonData, ["appId", "appName", "sessionId", "library", "action", "deviceId"])
                         if(tmpErrors.length) {
                             this.send(JSON.stringify({"action":"jsonError", "message": tmpErrors}))
                         } else if(devices.map((item) => item.id == deviceId1).length > 0) {
+                            const appId = jsonData['appId'];
                             const appName = jsonData['appName']
                             const sessionId = jsonData['sessionId'];
                             const library = jsonData['library'];
                             const processID = jsonData['processID'];
-                            const session = await startApp(deviceId1, processID);
+                            console.log("About to attach " + appId + " app...with session id:" + sessionId);
+                            const process = await findProcesses(deviceId1, appName)
+                            if(process.length) {
+                                const processID = process[0]
+                                console.log(processID.pid);
+                                
+                                const session = await attachApp(deviceId1, processID['pid']);
+                                this.sessions.push({'id': sessionId, 'session': session})
+                                console.log(this.sessions);
+                                const channel = new Channels(session, appName, sessionId, appId, library, deviceId1, processID.pid);
+                                channel.connect()
+                                if(library && library !== null) {
+                                    const repl = new REPLManager(session, sessionId);
+                                    repl.run_script(library)
+                                } else {
+                                    this.send(JSON.stringify({"action":"jsonError", "message": ["No library provided"]}))
+                                }
+                            } else {
+                                this.send(JSON.stringify({"action":"error", "message": ["App not running!"]}))
+                            }
+                        } else {
+                            this.send(JSON.stringify({"action":"jsonError", "message":["No such device found!"]}))
+                        }
+                        break;
+                    case 'startApp':
+                        const deviceId2 = jsonData['deviceId']
+                        const tmpErrors2 = this.checkMissingParams(jsonData, ["appId", "appName", "sessionId", "library", "action", "deviceId"])
+                        if(tmpErrors2.length) {
+                            this.send(JSON.stringify({"action":"jsonError", "message": tmpErrors2}))
+                        } else if(devices.map((item) => item.id == deviceId2).length > 0) {
+                            const appId = jsonData['appId']
+                            const appName = jsonData['appName']
+                            const sessionId = jsonData['sessionId'];
+                            const library = jsonData['library'];
+                            console.log("About to start " + appId + " app...with session id:" + sessionId);
+                            const session = await startApp(deviceId2, appId);
                             this.sessions.push({'id': sessionId, 'session': session})
                             console.log(this.sessions);
-                            const channel = new Channels(session, appName, sessionId, processID, library, deviceId1);
+                            const channel = new Channels(session, appName, sessionId, appId, library, deviceId2);
                             channel.connect()
                             if(library && library !== null) {
                                 const repl = new REPLManager(session, sessionId);
                                 repl.run_script(library)
                             } else {
-                                this.send(JSON.stringify({"action":"jsonError", "message": "No library provided"}))
+                                this.send(JSON.stringify({"action":"jsonError", "message": ["No library provided"]}))
                             }
                         } else {
-                            this.send(JSON.stringify({"action":"jsonError", "message":"No such device found!"}))
+                            this.send(JSON.stringify({"action":"jsonError", "message":["No such device found!"]}))
                         }
                         break;
                     case 'detectLibraries':
@@ -178,7 +214,7 @@ class WebSocketClient {
                             this.ws.send(JSON.stringify({'action':'library', 'message':row}))
                         })
                     default:
-                        this.send(JSON.stringify({"action":"jsonError", "message": "Invalid action"}))
+                        this.send(JSON.stringify({"action":"jsonError", "message": ["Invalid action"]}))
                         break;
                 }
             }

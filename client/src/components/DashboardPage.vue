@@ -37,7 +37,8 @@
                     </div>
                 </div>
                 <ul class="app-list" v-if="data">
-                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.identifier, item.name)">
+                    <ContextMenu ref="menu" :model="appMenu" />
+                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.identifier, item.name)" @contextmenu="onRightClick($event, item)">
                         <img :src="item.icon">
                         <p>{{ item.name }}</p>
                     </li>
@@ -47,7 +48,7 @@
                         <template #content>
                             <i class="pi pi-info-circle" style="font-size: 35px; margin-bottom: 20px"></i>
                             <p class="m-0">
-                                Connected to <t style="display: block;">'{{ connectionAppName }}'</t> App!
+                                {{isSpawned ? 'Connected' : 'Attached'}} to <t style="display: block;">'{{ connectionAppName }}'</t> App!
                                 <!-- <AutoComplete style="display: block;" v-model="selectedLibrary" optionLabel="name" :suggestions="filteredLibraryList" @complete="search" /> -->
                                 
                                 <div style="display: flex; justify-content: center; align-items: center; gap: 10px" class="auto-detect-library-wrapper">
@@ -109,11 +110,13 @@ import Card from "primevue/card";
 import AutoComplete from "primevue/autocomplete";
 import Toast from 'primevue/toast';
 import Button from "primevue/button";
+import ContextMenu from "primevue/contextmenu";
 
 
 export default defineComponent({
 	name: 'DashboardPage',
     components: {
+        ContextMenu,
         Dropdown,
         Dialog,
         InputText,
@@ -126,6 +129,18 @@ export default defineComponent({
     },
     data() {
         return {
+            appMenu: [
+                {
+                    label: 'Spawn',
+                    icon: 'pi pi-plus',
+                    command: () => this.rightClickHandler('spawn')
+                },
+                {
+                    label: 'Attach',
+                    icon: 'pi pi-link',
+                    command: () => this.rightClickHandler('attach')
+                },
+            ],
             librariesDetected: false,
             librariesFound: [],
             libraryDetectionPopup: false,
@@ -143,7 +158,10 @@ export default defineComponent({
             connectionSessionId: -1,
             libraryList: [{name:'AFNetworking', file:'afnetworking.js', platform: 'iOS'}, {name:'TrustKit', file:'trustkit.js', platform: 'iOS'}, {name:'AlamoFire', file:'alamofire.js', platform: 'iOS'}, {name:'OkHTTP', file:'okhttp.js', platform: 'android'}],
             filteredLibraryList: [],
-            selectedLibrary: null
+            selectedLibrary: null,
+            rightClickMenuIdentifier: "",
+            rightClickMenuApp: "",
+            isSpawned: true
         }
     },
     mounted() {
@@ -163,7 +181,9 @@ export default defineComponent({
         },
     },
     created() {
-        const url = 'ws://localhost:8000';
+        console.log(import.meta.env);
+        
+        const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
@@ -195,6 +215,10 @@ export default defineComponent({
             } else if(message['action'] === 'apps') {
                 this.apps = message['apps'];
             } else if(message['action'] === 'startApp') {
+                this.isSpawned = true;
+                this.visibleDialog = true;
+            } else if(message['action'] === 'attachApp') {
+                this.isSpawned = false;
                 this.visibleDialog = true;
             } else if(message['action'] === 'deviceUpdate') {
                 this.connectionSessionId = parseInt(localStorage.getItem("sessionId"))
@@ -223,6 +247,9 @@ export default defineComponent({
             } else if (message['action'] == "error") {
                 this.showSticky(message['message'], 'Error', 'error')
                 console.log("got an error from script");
+            } else if (message['action'] == "jsonError") {
+                this.showSticky(message['message'][0], 'Error', 'error')
+                console.log("got an error from script");
             } else if (message['action'] == 'successOutput') {
                 this.showSticky(message['message'], 'Success', 'success')
                 console.log("got an output from server");
@@ -243,6 +270,20 @@ export default defineComponent({
         };
     },
     methods: {
+        rightClickHandler(type: string) {
+            if(type === 'spawn') {
+                console.log("Spawning | " + this.rightClickMenuApp + " | " + this.rightClickMenuIdentifier);                
+                this.startApp(this.rightClickMenuIdentifier, this.rightClickMenuApp)
+            } else {
+                console.log("Attaching | " + this.rightClickMenuApp + " | " + this.rightClickMenuApp);
+                this.attachApp(this.rightClickMenuIdentifier, this.rightClickMenuApp)
+            }
+        },
+        onRightClick(event: any, item: any) {
+            this.rightClickMenuIdentifier = item.identifier
+            this.rightClickMenuApp = item.name
+            this.$refs.menu.show(event);
+        },
         setLibrary() {
             if(this.isConnected) {
                 this.ws.send(JSON.stringify({'action': 'changeLibrary', 'library': this.selectedLibrary, 'sessionId': this.connectionSessionId}))
@@ -267,6 +308,16 @@ export default defineComponent({
             localStorage.setItem("sessionId", ""+sessionId)
             const library = this.selectedLibrary !== null ? this.selectedLibrary.file : null
             const json = {"action":"startApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
+            this.ws.send(JSON.stringify(json))
+        },
+        async attachApp(identifier: string, name: string) {
+            this.selectedApp = identifier
+            console.log(this.selectedDevice);
+            const sessionId = Math.floor(Math.random() * 100000);
+            this.connectionSessionId = sessionId
+            localStorage.setItem("sessionId", ""+sessionId)
+            const library = this.selectedLibrary !== null ? this.selectedLibrary.file : null
+            const json = {"action":"attachApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
             this.ws.send(JSON.stringify(json))
         },
         searchApp() {

@@ -185,7 +185,7 @@ export default defineComponent({
         }
     },
     created() {
-        const url = 'ws://localhost:8000';
+        const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.ws = new WebSocket(url);
 
         this.ws.onopen = () => {
