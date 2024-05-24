@@ -1,13 +1,15 @@
 <template>
     <div class="page">
         <!-- <v-grid :source="rows" :columns="columns" /> -->
+        <SelectButton v-model="value" :options="options" aria-labelledby="basic" style="position: absolute; left: 50%; top:15px; width: 400px; margin-left: -200px; z-index: 1000;"/>
+
         
-        <Splitter style="height: 100vh" layout="vertical">
+        <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 0px)" layout="vertical">
             <SplitterPanel class="flex align-items-center justify-content-center" :size="60">
-                <ContextMenu ref="cm" :model="menuModel" @hide="selectedRow = null" />
-                <DataTable contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
-                    <template #header :style="{'margin':0, 'padding':0}" class="traffic-header" :class="{'hidden': visibleTrafficHeader}">
-                        <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: space-between;" :style="{'display': visibleTrafficHeader ? 'flex': 'none'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
+                <ContextMenu ref="cm" :model="menuModel" />
+                <DataTable style="" contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
+                    <template #header :style="{'margin':0, 'padding':0}" class="traffic-header" :class="{'hidden1': visibleTrafficHeader}">
+                        <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: space-between;" :style="{'display': visibleTrafficHeader ? 'flex': 'flex'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
                             <Button type="button" icon="pi pi-filter-slash" label="Clear" outlined @click="" />
                             <IconField iconPosition="left">
                                 <InputIcon class="pi pi-search"> </InputIcon>
@@ -48,6 +50,36 @@
                 </Splitter>
             </SplitterPanel>
         </Splitter>
+    
+        <div v-if="value == 'Repeater'">
+            <p>Repeater</p>
+            <TabView>
+                <TabPanel v-for="tab in repeaterRows" :key="tab.id" :header="tab.id">
+                    <Splitter class="repeater-viewer-split">
+                        <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
+                            <VCodeBlock
+                                class="history-viewer-split-code"
+                                :code="tab.requestContent"
+                                highlightjs
+                                lang="http"
+                                theme="vs"
+                                style="text-align: left; word-wrap: break-word; text-wrap: wrap"
+                            />
+                        </SplitterPanel>
+                        <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
+                            <VCodeBlock
+                                class="history-viewer-split-code"
+                                :code="tab.responseContent"
+                                highlightjs
+                                lang="http"
+                                theme="atom-one-light"
+                                style="text-align: left; word-wrap: break-word; text-wrap: wrap"
+                            />
+                        </SplitterPanel>
+                    </Splitter>
+                </TabPanel>
+            </TabView>
+        </div>
 
     </div>
 </template>
@@ -65,18 +97,28 @@ import Button from 'primevue/button';
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import { VCodeBlock } from '@wdns/vue-code-block';
+import TabPanel from 'primevue/tabpanel';
+import TabView from 'primevue/tabview';
 // import Prism from "prismjs";
 // import "prismjs/themes/prism-dark.css";
 // import 'prismjs/components/prism-http';
 import HighlightJS from 'highlightjs';
 import "highlightjs/styles/vs.css";
 import ContextMenu from 'primevue/contextmenu';
+import SelectButton from 'primevue/selectbutton';
+import { useSessionStore } from '../stores/session';
+import Listbox from 'primevue/listbox';
+
 
 
 export default defineComponent({
     name: 'App',
     data() {
         return {
+            selectedRepeaterTab: null,
+            sess: null,
+            value: 'Proxy',
+            options: ['Proxy', 'Repeater'],
             connection: null,
             isConnected: false,
             message: '',
@@ -95,17 +137,20 @@ export default defineComponent({
                 endpoint: { value: null, matchMode: FilterMatchMode.CONTAINS }
             },
             rows: [],
+            repeaterRows: [],
             requestContent: "",
             responseContent: "",
             visibleTrafficHeader: false,
             selectedRow: null,
             menuModel: [
-                {label: 'View', icon: 'pi pi-fw pi-search', command: () => this.viewProduct(this.selectedRow)},
-                {label: 'Delete', icon: 'pi pi-fw pi-times', command: () => this.deleteProduct(this.selectedRow)}
+                {label: 'Send To Repeater', icon: 'pi pi-fw pi-reply', command: () => this.sendToRepeater(this.selectedRow)},
             ]
         };
     },
     components: {
+        SelectButton,
+        TabView,
+        TabPanel,
         VGrid,
         DataTable,
         Column,
@@ -116,15 +161,23 @@ export default defineComponent({
         Splitter,
         SplitterPanel,
         VCodeBlock,
-        HighlightJS
+        ContextMenu,
+        Listbox,
+        HighlightJS,
     },
     created() {
-        // Replace with your server URL
+        this.sess = useSessionStore();
+        if(this.sess.session.name === null) {
+            this.sess.$patch({'error': 'Select A Session First!'})
+            this.$router.push({name: 'Dashboard'})
+        }
+
         const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.connection = new WebSocket(url);
 
         this.connection.onopen = () => {
             this.isConnected = true;
+            this.connection.send(JSON.stringify({'action': 'repeaterUpdate'}))
             console.log('Connected to WebSocket server');
         };
 
@@ -137,6 +190,45 @@ export default defineComponent({
                 this.rows = JSON.parse(message.message);
             } else if(message.action == "trafficUpdate") {
                 this.rows.push(message.message);
+            } else if(message.action == "repeaterAdd") {
+                const element = message.message;
+                var tmpData = element.method + " " + element.endpoint + "\n"
+                tmpData += JSON.parse(element.request_headers).join("\n")
+                console.log(element);
+                console.log(element.request_body);
+                if(element.request_body) {
+                    tmpData += "\n\n" + element.request_body
+                } else {
+                    tmpData += "\n\n " 
+                }
+                
+                var tmpRequestContent = tmpData
+                tmpData = JSON.parse(element.response_headers).join("\n")
+                tmpData += "\n\n" + element.response_body
+                
+                var tmpResponseContent = tmpData
+                this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent})
+                this.value = "Repeater"
+            } else if(message.action == "repeaterUpdate") {
+                message.message.forEach((element: any) => {
+                    console.log(element);
+                    var tmpData = element.method + " " + element.endpoint + "\n"
+                    tmpData += JSON.parse(element.request_headers).join("\n")
+                    console.log(element);
+                    console.log(element.request_body);
+                    if(element.request_body) {
+                        tmpData += "\n\n" + element.request_body
+                    } else {
+                        tmpData += "\n\n " 
+                    }
+                    
+                    var tmpRequestContent = tmpData
+                    tmpData = JSON.parse(element.response_headers).join("\n")
+                    tmpData += "\n\n" + element.response_body
+                    
+                    var tmpResponseContent = tmpData
+                    this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent})
+                });
             }
 
             console.log(this.rows);
@@ -154,6 +246,11 @@ export default defineComponent({
         };
     },
     methods: {
+        sendToRepeater(row: any) {
+            console.log(row.id);
+            this.connection.send(JSON.stringify({'action': 'sendToRepeater', 'id': row.id}))
+            
+        },
         onRowContextMenu(event: any) {
             console.log(this.$refs.cm);
             
@@ -210,10 +307,9 @@ export default defineComponent({
 
 
 <style scoped>
-.p-datatable:first-child{
+.p-datatable .p-datatable-header{
     background-color: red;
-    padding: 0
-    ;
+    padding: 0;
 }
 .p-datatable div.p-datatable-header {
     padding: 0 !important;

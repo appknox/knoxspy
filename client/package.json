@@ -27,6 +27,7 @@
     "@revolist/vue3-datagrid": "^4.0.0-next.1",
     "@wdns/vue-code-block": "^2.3.2",
     "highlightjs": "^9.16.2",
+    "pinia": "^2.1.7",
     "primeicons": "^7.0.0",
     "primevue": "^3.52.0",
     "prismjs": "^1.29.0",

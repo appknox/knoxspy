@@ -6,6 +6,7 @@
         </div>
         <ul>
             <li><router-link to="/"><i class="pi pi-home" style="margin-right: 10px"></i><span :class="{'active': isActive}">Dashboard</span></router-link></li>
+            <li><router-link to="/apps"><i class="pi pi-th-large" style="margin-right: 10px"></i><span :class="{'active': isActive}">Apps</span></router-link></li>
             <li><router-link to="/traffic"><i class="pi pi-history mr-2" style="margin-right: 10px"></i><span :class="{'active': isActive}">HTTP Traffic</span></router-link></li>
             <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isActive}">Library Manager</span></router-link></li>
         </ul>
@@ -30,15 +31,19 @@ import ToggleButton from "primevue/togglebutton";
 import { useSessionStore } from "../stores/session";
 
 export default defineComponent({
-	name: 'DashboardPage',
+	name: 'SideBar',
     data() {
         return {
             ws: null,
             isConnected: false,
             connectionStatus: "Not Connected",
-            connectionAppName: "",
+            connectionAppName: null,
+            connectionAppIdentifier: null,
+            connectionDeviceId: null,
+            connectionLibrary: null,
             isActive: false,
-            connectionSessionId: -1
+            connectionSessionId: -1,
+            sess: null
         }
     },
     components: {
@@ -49,87 +54,32 @@ export default defineComponent({
     },
     methods: {
         toggleSidebar() {            
-            console.log("sidebar toggled");
-            
             this.isActive = !this.isActive;
         },
         restartApp() {
-            const appId = localStorage.getItem("appId")
-            const appName = localStorage.getItem("appName")
-            const library = localStorage.getItem("library")
-            const deviceId = localStorage.getItem("deviceId")
             const sessionId = Math.floor(Math.random() * 100000);
-            const tmpLibrary = library !== 'null' ? library : null
-            this.connectionSessionId = sessionId
-            localStorage.setItem("sessionId", ""+sessionId)
-            const json = {"action":"startApp", "deviceId": deviceId, "appId": appId, 'appName': appName, 'sessionId': sessionId, 'library': tmpLibrary}
-            this.ws.send(JSON.stringify(json))
+            this.sess.restartApp(sessionId)
         }
     },
     created() {
-        const sess = useSessionStore();
+        this.sess = useSessionStore();
         
-
-        sess.$subscribe((mutation, state) => {
-            console.log(mutation.payload);
-            
-        })
-
-        const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
-        this.ws = new WebSocket(url);
-
-        this.ws.onopen = () => {
-            this.isConnected = true;
-            console.log('Connected to WebSocket server');
-        };
-
-        this.ws.onmessage = (event: { data: string; }) => {
-            const message = JSON.parse(event.data);
-            if(message['action'] === 'deviceUpdate') {
-                this.connectionSessionId = parseInt(localStorage.getItem("sessionId"))
-                const tmpSessionId = message['sessionId']
-                if(tmpSessionId === this.connectionSessionId) {
-                    this.connectionAppName = `(${message['appName']})`
-                    this.connectionStatus = message['message']
-                    if(message['message'] === "Connected") {
-                        this.isConnected = true;
-                        localStorage.setItem("appId", message["appId"])
-                        localStorage.setItem("appName", message["appName"])
-                        localStorage.setItem("library", message["library"])
-                        localStorage.setItem("deviceId", message["deviceId"])
-                    } else {
-                    this.connectionAppName = ``
-                        this.isConnected = false;
-                        localStorage.setItem("appId", "")
-                        localStorage.setItem("appName", "")
-                        localStorage.setItem("library", "")
-                        localStorage.setItem("deviceId", "")
-                    }
-                } else {
-                    console.log("Old Session Got Disconnected: " + tmpSessionId + " | Current Session Id: " + this.connectionSessionId);  
+        this.sess.$subscribe((mutation, state) => {
+            if(mutation.type === 'patch object') {
+                if('app' in mutation.payload) {
+                    console.log(mutation.payload);
+                    const appConnectionObj = mutation.payload.app;
+                    console.log(appConnectionObj);
+                    this.isConnected = appConnectionObj.isConnected;
+                    this.connectionAppName = appConnectionObj.name;
+                    this.connectionStatus = appConnectionObj.status;
+                    this.connectionSessionId = appConnectionObj.sessionId;
+                    this.connectionAppIdentifier = appConnectionObj.identifier;
+                    this.connectionDeviceId = appConnectionObj.deviceId;
+                    this.connectionLibrary = appConnectionObj.library;
                 }
-
-                // if(message['message'] == "Connected") {
-                //     this.connectionSessionId = message['sessionId'];
-                //     this.connectionStatus = message['message']
-                //     this.connectionAppName = `(${message['appName']})`
-                // } else {
-                //     if(message['sessionId'] == this.connectionSessionId) {
-                //         this.connectionStatus = message['message']
-                //         this.connectionAppName = `(${message['appName']})`
-                //     }
-                // }
             }
-        };
-
-        this.ws.onerror = (error: any) => {
-            console.error('WebSocket error:', error);
-        };
-
-        this.ws.onclose = () => {
-            this.isConnected = false;
-            console.log('WebSocket connection closed');
-        };
+        });
     }
 });
 </script>

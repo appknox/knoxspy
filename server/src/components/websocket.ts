@@ -15,12 +15,14 @@ class WebSocketClient {
     manager: WebSocketManager
     devices: Session[]
     sessions: any[]
+    currentSession: Object
 
     constructor(ws: WebSocket, manager: WebSocketManager) {
         this.ws = ws;
         this.manager = manager;
         this.devices = [];
         this.sessions = [];
+        this.currentSession = {'name': '', 'id': -1}
         ws.on('close', this.close)
         ws.on('message', this.message)
         this.init(ws)
@@ -29,7 +31,11 @@ class WebSocketClient {
     init(ws: WebSocket) {
         console.log('Client connected');
         dbManager.getDataFromDatabase((data) => {
-            ws.send(JSON.stringify({'action':'trafficInit', 'message': data}))
+            console.log("fetching history");
+            dbManager.getActiveSession((row: string) => {
+                console.log(JSON.parse(row));
+                ws.send(JSON.stringify({'action':'trafficInit', 'message': data, 'session': JSON.parse(row)}))
+            })
         })
     }
 
@@ -127,7 +133,7 @@ class WebSocketClient {
                                 const channel = new Channels(session, appName, sessionId, appId, library, deviceId1, processID.pid);
                                 channel.connect()
                                 if(library && library !== null) {
-                                    const repl = new REPLManager(session, sessionId);
+                                    const repl = new REPLManager(session, sessionId, this.currentSession);
                                     repl.run_script(library)
                                 } else {
                                     this.send(JSON.stringify({"action":"jsonError", "message": ["No library provided"]}))
@@ -156,7 +162,7 @@ class WebSocketClient {
                             const channel = new Channels(session, appName, sessionId, appId, library, deviceId2);
                             channel.connect()
                             if(library && library !== null) {
-                                const repl = new REPLManager(session, sessionId);
+                                const repl = new REPLManager(session, sessionId, this.currentSession);
                                 repl.run_script(library)
                             } else {
                                 this.send(JSON.stringify({"action":"jsonError", "message": ["No library provided"]}))
@@ -173,7 +179,7 @@ class WebSocketClient {
                         if(tmpSession.length > 0) {
                             if(tmpSession[0]) {
                                 console.log(tmpSession[0]);
-                                const repl = new REPLManager(tmpSession[0]['session'], sessionId)
+                                const repl = new REPLManager(tmpSession[0]['session'], sessionId, this.currentSession)
                                 repl.detect_libraries()
                                 
                             }
@@ -188,7 +194,7 @@ class WebSocketClient {
                         if(tmpSession1.length > 0) {
                             if(tmpSession1[0]) {
                                 console.log(tmpSession1[0]);
-                                const repl = new REPLManager(tmpSession1[0]['session'], tmpSessionId)
+                                const repl = new REPLManager(tmpSession1[0]['session'], tmpSessionId, this.currentSession)
                                 repl.run_script(tmpLibrary)
                                 console.log("changedLibrary already");
                             }
@@ -212,7 +218,43 @@ class WebSocketClient {
                     case 'library':
                         dbManager.getLibraries((row) => {
                             this.ws.send(JSON.stringify({'action':'library', 'message':row}))
+                        });
+                        break;
+                    case 'createNewSession':
+                        const tmpSessionName = jsonData['name']
+                        const tmpPayload = {'name': tmpSessionName}
+                        dbManager.newSession(tmpPayload, (lastId: number) => {
+                            this.manager.broadcastData(JSON.stringify({'action': 'sessionCreated', 'session': {'name': tmpSessionName, 'id': lastId}}))
                         })
+                        break;
+                    case 'chooseSession':
+                        dbManager.setActiveSession(jsonData['session'].id, (id) => {
+                            console.log("Active session: " + jsonData['session'].name);
+
+                        })
+                        
+                        break;
+                    case 'sendToRepeater':
+                        const tmpRepeaterPayload = jsonData['id']
+                        console.log("Row ID:" + tmpRepeaterPayload);
+                        dbManager.sendToRepeater(tmpRepeaterPayload, (lastObj: any) => {
+                            console.log("Entry created: " + lastObj.id);
+                            this.manager.broadcastData(JSON.stringify({'action': 'repeaterAdd', 'message': lastObj}))                            
+                        });                      
+                        break;
+                    case 'sessions':
+                        dbManager.getSessions(-1, (sessions: string) => {
+                            this.manager.broadcastData(JSON.stringify({'action': 'sessionList', 'sessions': JSON.parse(sessions)}))
+                        })
+                        dbManager.getActiveSession((row: string) => {
+                            this.manager.broadcastData(JSON.stringify({'action': 'activeSession', 'session': JSON.parse(row)}))
+                        })
+                        break;
+                    case 'repeaterUpdate':
+                        dbManager.getRepeaterTraffic((sessions: any) => {
+                            this.manager.broadcastData(JSON.stringify({'action': 'repeaterUpdate', 'message': JSON.parse(sessions)}))
+                        })
+                        break;
                     default:
                         this.send(JSON.stringify({"action":"jsonError", "message": ["Invalid action"]}))
                         break;

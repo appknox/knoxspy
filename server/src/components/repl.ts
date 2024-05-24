@@ -10,10 +10,12 @@ class REPLManager {
     ws: WebSocket
     db: DBManager
     sessionId: number
+    currentSession: Object
 
-    constructor(session: Session, sessionId: number) {
+    constructor(session: Session, sessionId: number, sessionObj: Object) {
         this.session = session
         this.sessionId = sessionId
+        this.currentSession = sessionObj
         console.log("REPL Constructor called!");
 
         this.ws = new WebSocket('ws://localhost:8000')
