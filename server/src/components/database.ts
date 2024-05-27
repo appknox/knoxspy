@@ -319,8 +319,31 @@ class DBManager {
                 });
             });
         })
+    }
 
+
+    updateReplayedRepeater(row: any, callback: (lastObj: any) => void) {
+        var tmpData = row;
+        const tmpId = row.id;
+        delete tmpData.id;
+        console.log(tmpData);
+        const columns = Object.keys(tmpData);
+        var values = Object.values(tmpData);
+        values.push(tmpId)
+        const placeholders = columns.map((item) => item + '=?').join(',');
+
+        const sql = `UPDATE repeater_traffic set ${placeholders} where id=?`;
+        console.log(sql);
         
+        this.db.run(sql, values, function(err: any) {
+            if (err) {
+                console.error(`Error updating data into repeater_traffic: ${err.message}`);
+                callback({})
+            } else {
+                console.log(`Rows updated in repeater_traffic at ${tmpId}`);
+                callback(tmpData)
+            }
+        });        
     }
 
     close() {

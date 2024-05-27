@@ -1,20 +1,24 @@
 <template>
     <div class="page">
         <!-- <v-grid :source="rows" :columns="columns" /> -->
-        <SelectButton v-model="value" :options="options" aria-labelledby="basic" style="position: absolute; left: 50%; top:15px; width: 400px; margin-left: -200px; z-index: 1000;"/>
+        <div style="display: flex; align-items: center; border-bottom: 1px solid #eee; position: relative;">
+            <SelectButton v-model="value" :options="options" aria-labelledby="basic" style="position: absolute; left: 30px; top: 8px; z-index: 1000; text-align: center"/>
 
-        
+            <!-- <SelectButton v-model="value" :options="options" aria-labelledby="basic" style="margin-left: 30px; margin-right: 30px; padding: 5px"/> -->
+        </div>
+
         <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 0px)" layout="vertical">
             <SplitterPanel class="flex align-items-center justify-content-center" :size="60">
                 <ContextMenu ref="cm" :model="menuModel" />
-                <DataTable style="" contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']">
+                <DataTable style="" contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']" size="small">
                     <template #header :style="{'margin':0, 'padding':0}" class="traffic-header" :class="{'hidden1': visibleTrafficHeader}">
-                        <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: space-between;" :style="{'display': visibleTrafficHeader ? 'flex': 'flex'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
-                            <Button type="button" icon="pi pi-filter-slash" label="Clear" outlined @click="" />
+                        <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: end; gap: 10px" :style="{'display': visibleTrafficHeader ? 'flex': 'flex'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
+                            
                             <IconField iconPosition="left">
                                 <InputIcon class="pi pi-search"> </InputIcon>
                                 <InputText v-model="filters['global'].value" placeholder="Keyword Search" />
                             </IconField>
+                            <Button type="button" icon="pi pi-filter-slash" @click="" />
                         </div>
                     </template>
                     <Column field="id" header="#" sortable style="width: 50px; font-size: 13px"></Column>
@@ -35,6 +39,7 @@
                             lang="http"
                             theme="vs"
                             style="text-align: left; word-wrap: break-word; text-wrap: wrap"
+                            :extensions="extensions"
                         />
                     </SplitterPanel>
                     <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
@@ -52,40 +57,25 @@
         </Splitter>
     
         <div v-if="value == 'Repeater'">
-            <p>Repeater</p>
-            <TabView>
-                <TabPanel v-for="tab in repeaterRows" :key="tab.id" :header="tab.id">
-                    <Splitter class="repeater-viewer-split">
-                        <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
-                            <VCodeBlock
-                                class="history-viewer-split-code"
-                                :code="tab.requestContent"
-                                highlightjs
-                                lang="http"
-                                theme="vs"
-                                style="text-align: left; word-wrap: break-word; text-wrap: wrap"
-                            />
-                        </SplitterPanel>
-                        <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
-                            <VCodeBlock
-                                class="history-viewer-split-code"
-                                :code="tab.responseContent"
-                                highlightjs
-                                lang="http"
-                                theme="atom-one-light"
-                                style="text-align: left; word-wrap: break-word; text-wrap: wrap"
-                            />
-                        </SplitterPanel>
-                    </Splitter>
-                </TabPanel>
-            </TabView>
+            <TabMenu v-if="value == 'Repeater'" v-model:activeIndex="activeRepeaterTab" :model="repeaterRows" @tab-change="changeRepeater" style="padding-left: 230px; padding-right: 130px;"/>
+            <Splitter class="repeater-viewer-split">
+                <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
+                    <Textarea v-model="activeRepeaterData.requestContent" rows="5" style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px;  background-color: var(--surface-100);"/>
+                    <!-- <textarea style="text-align: left;" v-model="activeRepeaterData" id="code-editor" class="code-editor"></textarea> -->
+                </SplitterPanel>
+                <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
+                    <Textarea v-model="activeRepeaterData.responseContent" rows="5" style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px; background-color: var(--surface-100);" readonly />
+                    <!-- <textarea style="text-align: left;" v-model="activeRepeaterData" id="code-viewer" class="code-viewer"></textarea> -->
+                </SplitterPanel>
+            </Splitter>
+            <Button label="Replay" style="position: fixed; top: 7px; right: 10px;" icon="pi pi-send" @click="replayRequest" />
         </div>
 
     </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue';
+import { defineComponent } from 'vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import InputText from 'primevue/inputtext';
@@ -99,25 +89,32 @@ import SplitterPanel from 'primevue/splitterpanel';
 import { VCodeBlock } from '@wdns/vue-code-block';
 import TabPanel from 'primevue/tabpanel';
 import TabView from 'primevue/tabview';
-// import Prism from "prismjs";
-// import "prismjs/themes/prism-dark.css";
-// import 'prismjs/components/prism-http';
-import HighlightJS from 'highlightjs';
-import "highlightjs/styles/vs.css";
 import ContextMenu from 'primevue/contextmenu';
 import SelectButton from 'primevue/selectbutton';
 import { useSessionStore } from '../stores/session';
 import Listbox from 'primevue/listbox';
+import Codemirror from "codemirror-editor-vue3";
+import "codemirror/addon/display/placeholder.js";
+import "codemirror/mode/javascript/javascript.js";
+import "codemirror/mode/http/http.js";
+import "codemirror/addon/display/placeholder.js";
+import "codemirror/theme/idea.css";
+import TabMenu from 'primevue/tabmenu';
+import Textarea from 'primevue/textarea';
+import Toolbar from 'primevue/toolbar';
 
+import { HTTPParser } from 'http-parser-js';
 
 
 export default defineComponent({
     name: 'App',
     data() {
         return {
+            activeRepeaterTab: 0,
+            activeRepeaterData: "",
             selectedRepeaterTab: null,
             sess: null,
-            value: 'Proxy',
+            value: 'Repeater',
             options: ['Proxy', 'Repeater'],
             connection: null,
             isConnected: false,
@@ -144,10 +141,19 @@ export default defineComponent({
             selectedRow: null,
             menuModel: [
                 {label: 'Send To Repeater', icon: 'pi pi-fw pi-reply', command: () => this.sendToRepeater(this.selectedRow)},
-            ]
+            ],
+            cmOptions: {
+                mode: "text/javascript", // Language mode
+                theme: "base16-light", // Theme
+            },
+            repeaterRequestViewer: null,
+            repeaterResponseViewer: null
         };
     },
     components: {
+        Toolbar,
+        Textarea,
+        TabMenu,
         SelectButton,
         TabView,
         TabPanel,
@@ -163,7 +169,8 @@ export default defineComponent({
         VCodeBlock,
         ContextMenu,
         Listbox,
-        HighlightJS,
+    },
+    setup() {
     },
     created() {
         this.sess = useSessionStore();
@@ -171,6 +178,12 @@ export default defineComponent({
             this.sess.$patch({'error': 'Select A Session First!'})
             this.$router.push({name: 'Dashboard'})
         }
+
+    
+            
+        // CodeMirror.fromTextArea(document.getElementById("repeaterRequestViewer"), {
+        //     lineNumbers: true
+        // });
 
         const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.connection = new WebSocket(url);
@@ -184,7 +197,7 @@ export default defineComponent({
         this.connection.onmessage = (event) => {
             const message = JSON.parse(event.data); // Assuming JSON data
             console.log(message.action);
-            console.log(message.message);
+            // console.log(message.message);
             
             if(message.action == "trafficInit") {
                 this.rows = JSON.parse(message.message);
@@ -207,15 +220,16 @@ export default defineComponent({
                 tmpData += "\n\n" + element.response_body
                 
                 var tmpResponseContent = tmpData
-                this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent})
+                this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: element.id, element: element})
+                // this.repeaterRows.push({label: element.host + element.endpoint})
                 this.value = "Repeater"
             } else if(message.action == "repeaterUpdate") {
                 message.message.forEach((element: any) => {
-                    console.log(element);
+                    // console.log(element);
                     var tmpData = element.method + " " + element.endpoint + "\n"
                     tmpData += JSON.parse(element.request_headers).join("\n")
-                    console.log(element);
-                    console.log(element.request_body);
+                    // console.log(element);
+                    // console.log(element.request_body);
                     if(element.request_body) {
                         tmpData += "\n\n" + element.request_body
                     } else {
@@ -227,13 +241,35 @@ export default defineComponent({
                     tmpData += "\n\n" + element.response_body
                     
                     var tmpResponseContent = tmpData
-                    this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent})
+                    this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: element.id, element: element})
                 });
+                // console.log(this.activeRepeaterData);
+                this.activeRepeaterData = this.repeaterRows[0]
+                // this.repeaterRequestViewer.setValue(this.activeRepeaterData.requestContent)
+                // this.repeaterResponseViewer.setValue(this.activeRepeaterData.responseContent)
+                // console.log(this.activeRepeaterData);
+                
+            } else if(message.action === "replayUpdate") {
+                const element = message.replay;
+                var tmpData = element.method + " " + element.endpoint + "\n"
+                tmpData += JSON.parse(element.request_headers).join("\n")
+                // console.log(element);
+                // console.log(element.request_body);
+                if(element.request_body) {
+                    tmpData += "\n\n" + element.request_body
+                } else {
+                    tmpData += "\n\n " 
+                }
+                
+                var tmpRequestContent = tmpData
+                tmpData = JSON.parse(element.response_headers).join("\n")
+                tmpData += "\n\n" + element.response_body
+                
+                var tmpResponseContent = tmpData
+                var tmpUpdatedRequest = {id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: element.id, element: element}
+                this.activeRepeaterData = tmpUpdatedRequest;
+                this.repeaterRows[element.id] = tmpUpdatedRequest;
             }
-
-            console.log(this.rows);
-            
-            
         };
 
         this.connection.onerror = (error) => {
@@ -245,7 +281,84 @@ export default defineComponent({
             console.log('WebSocket connection closed');
         };
     },
+    updated() {
+    },
     methods: {
+        parseRequest(requestData: string) {
+            const lines = requestData.split('\n');
+            const [method, path] = lines[0].split(' ');
+
+            const headers = [];
+            let body = '';
+            let isBody = false;
+
+            for (let i = 1; i < lines.length; i++) {
+                if (isBody) {
+                    body += lines[i];
+                } else if (lines[i] === '') {
+                    isBody = true;
+                } else {
+                    // const [key, value] = lines[i].split(': ');
+                    headers.push(lines[i]);
+                }
+            }
+
+            console.log(method);
+            console.log(path);
+            console.log(headers);
+            console.log(body);
+            
+            const parsedRequest = {
+                method,
+                "endpoint": path,
+                "request_headers": JSON.stringify(headers),
+                "request_body": body,
+            };
+            return parsedRequest;
+        },
+        replayRequest() {
+            var tmpRepeaterPayload = this.parseRequest(this.activeRepeaterData.requestContent);
+            const tmpRepeaterData = this.activeRepeaterData.element;
+            console.log(this.activeRepeaterData.element);
+            // console.log(tmpRepeaterPayload);
+            
+            tmpRepeaterPayload['id'] = tmpRepeaterData.id;
+            tmpRepeaterPayload['host'] = tmpRepeaterData.host;
+            tmpRepeaterPayload['status_code'] = tmpRepeaterData.status_code
+            tmpRepeaterPayload['response_body'] = tmpRepeaterData.response_body
+            tmpRepeaterPayload['response_headers'] = tmpRepeaterData.response_headers
+            tmpRepeaterPayload['session_id'] = tmpRepeaterData.session_id
+            console.log(tmpRepeaterPayload);
+            this.connection.send(JSON.stringify({'action': 'replayRequest', 'replay': tmpRepeaterPayload}))
+        },
+        changeRepeater(event: any) {
+            console.log(event.index);
+            console.log(this.activeRepeaterData);
+            this.activeRepeaterData = this.repeaterRows[event.index]
+            // this.re
+            // this.repeaterRequestViewer.setValue(this.activeRepeaterData.requestContent)
+            // this.repeaterResponseViewer.setValue(this.activeRepeaterData.responseContent)
+        },
+        setupEditor() {
+            // console.log(document.getElementsByClassName("code-editor"))
+            // this.repeaterRequestViewer = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+            //     lineNumbers: true,
+            //     mode: "http",
+            //     theme: "idea",
+            //     lineWrapping: true
+            // });
+            // this.repeaterResponseViewer = CodeMirror.fromTextArea(document.getElementById("code-viewer"), {
+            //     lineNumbers: true,
+            //     mode: "http",
+            //     theme: "idea",
+            //     lineWrapping: true,
+            //     readOnly: true,
+                
+            // });
+        },
+        handleReady(payload: any) {
+            this.view.value = payload.view
+        },
         sendToRepeater(row: any) {
             console.log(row.id);
             this.connection.send(JSON.stringify({'action': 'sendToRepeater', 'id': row.id}))
@@ -265,7 +378,7 @@ export default defineComponent({
             console.log(event.data);
             console.log(event.data.request_body);
             if(event.data.request_body) {
-                tmpData += "\n\n" + JSON.parse(event.data.request_body)
+                tmpData += "\n\n" + event.data.request_body
             } else {
                 tmpData += "\n\n " 
             }
@@ -301,12 +414,22 @@ export default defineComponent({
             grid.resize = true;
             grid.autoSizeColumn = true;
         }
+        this.setupEditor()
     }
 });
 </script>
 
 
 <style scoped>
+textarea:focus {
+    outline: 0;
+}
+.page {
+    text-align: left  !important;
+}
+.Codemirror pre.Codemirror-line {
+    text-align: left;
+}
 .p-datatable .p-datatable-header{
     background-color: red;
     padding: 0;

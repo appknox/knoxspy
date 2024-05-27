@@ -107,6 +107,7 @@ export default defineComponent({
                     // console.log(this.sess.session);
                     this.isSessionActive = true
                 }
+                this.$router.push({path: '/traffic'})
                 
             }
         };

@@ -255,6 +255,15 @@ class WebSocketClient {
                             this.manager.broadcastData(JSON.stringify({'action': 'repeaterUpdate', 'message': JSON.parse(sessions)}))
                         })
                         break;
+                    case 'replayRequest':
+                        var tmpReplayPayload = jsonData['replay']
+                        // console.log(tmpReplayPayload);
+                        dbManager.updateReplayedRepeater(tmpReplayPayload, (updated: any) => {
+                            console.log("updated replayed request");
+                            console.log(updated);                            
+                        });
+                        this.manager.broadcastData(JSON.stringify({'action': 'replayUpdate', 'replay': tmpReplayPayload}))
+                        break;
                     default:
                         this.send(JSON.stringify({"action":"jsonError", "message": ["Invalid action"]}))
                         break;

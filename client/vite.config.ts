@@ -6,4 +6,7 @@ export default defineConfig({
     plugins: [
         vue(),
     ],
+    optimizeDeps: {
+        exclude: ['vue-codemirror6']
+    }
 })
