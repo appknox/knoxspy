@@ -252,17 +252,33 @@ class WebSocketClient {
                         break;
                     case 'repeaterUpdate':
                         dbManager.getRepeaterTraffic((sessions: any) => {
-                            this.manager.broadcastData(JSON.stringify({'action': 'repeaterUpdate', 'message': JSON.parse(sessions)}))
+                            this.manager.broadcastData(JSON.stringify({'action': 'repeaterUpdate', 'message': JSON.parse(sessions) }))
                         })
                         break;
                     case 'replayRequest':
-                        var tmpReplayPayload = jsonData['replay']
-                        // console.log(tmpReplayPayload);
-                        dbManager.updateReplayedRepeater(tmpReplayPayload, (updated: any) => {
-                            console.log("updated replayed request");
-                            console.log(updated);                            
-                        });
-                        this.manager.broadcastData(JSON.stringify({'action': 'replayUpdate', 'replay': tmpReplayPayload}))
+                        var replayPayload = jsonData['replay']
+                        var appData = jsonData['appData'];
+                        var library = "okhttp_repeater.js";
+                        console.log('Replay request: ', replayPayload);
+                        const process = await findProcesses(appData.deviceId, appData.appName)
+                        const processID = process[0]
+                        const session = await attachApp(appData.deviceId, processID['pid']);
+                        this.sessions.push({'id': appData.sessionId, 'session': session})
+                        const channel = new Channels(session, appData.appName, appData.sessionId, appData.appId, library, appData.deviceId, processID.pid);
+                        channel.connect()
+                        if(library && library !== null) {
+                            const repl = new REPLManager(session, appData.sessionId, this.currentSession);
+                            repl.attach_script(library, replayPayload, this.manager);
+                        } 
+                        else {
+                            this.send(JSON.stringify({"action":"jsonError", "message": ["No library provided"]}))
+                        }
+
+                        // dbManager.updateReplayedRepeater(replayPayload, (updated: any) => {
+                        //      console.log("updated replayed request");
+                        //      console.log(updated);                            
+                        // });
+                        //this.manager.broadcastData(JSON.stringify({'action': 'replayUpdate', 'replay': replayPayload}))
                         break;
                     default:
                         this.send(JSON.stringify({"action":"jsonError", "message": ["Invalid action"]}))

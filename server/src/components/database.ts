@@ -283,9 +283,7 @@ class DBManager {
                         response_body: row.response_body,
                         request_body: row.request_body,
                         session_id: row.session_id
-                    }));
-                    // console.log(jsonData);
-    
+                    }));    
                     callback(JSON.stringify(jsonData));
                 }
             });
@@ -325,6 +323,7 @@ class DBManager {
     updateReplayedRepeater(row: any, callback: (lastObj: any) => void) {
         var tmpData = row;
         const tmpId = row.id;
+        console.log("Temp data over here:", tmpData);
         delete tmpData.id;
         console.log(tmpData);
         const columns = Object.keys(tmpData);
@@ -341,6 +340,7 @@ class DBManager {
                 callback({})
             } else {
                 console.log(`Rows updated in repeater_traffic at ${tmpId}`);
+                tmpData['id'] = tmpId;
                 callback(tmpData)
             }
         });        

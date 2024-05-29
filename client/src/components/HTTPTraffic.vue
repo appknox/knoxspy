@@ -60,11 +60,29 @@
             <TabMenu v-if="value == 'Repeater'" v-model:activeIndex="activeRepeaterTab" :model="repeaterRows" @tab-change="changeRepeater" style="padding-left: 230px; padding-right: 130px;"/>
             <Splitter class="repeater-viewer-split">
                 <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
-                    <Textarea v-model="activeRepeaterData.requestContent" rows="5" style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px;  background-color: var(--surface-100);"/>
+                    <codemirror
+                        v-model="activeRepeaterData.requestContent"
+                        placeholder="Code goes here..."
+                        style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px;  background-color: var(--surface-100)"
+                        :autofocus="true"
+                        :extensions="codeMirrorOptions.extensions"
+                        :indent-with-tab="true"
+                        :tab-size="2"
+                    />
+                    <!-- <Textarea v-model="activeRepeaterData.requestContent" rows="5" style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px;  background-color: var(--surface-100);"/> -->
                     <!-- <textarea style="text-align: left;" v-model="activeRepeaterData" id="code-editor" class="code-editor"></textarea> -->
                 </SplitterPanel>
                 <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
-                    <Textarea v-model="activeRepeaterData.responseContent" rows="5" style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px; background-color: var(--surface-100);" readonly />
+                    <codemirror
+                        v-model="activeRepeaterData.responseContent"
+                        style="width: calc(100% - 10px); height: calc(100vh - 67px); border: 0; margin: 5px; background-color: var(--surface-100)"
+                        :autofocus="true"
+                        :indent-with-tab="true"
+                        :tab-size="2"
+                        :extensions="codeMirrorOptions.extensions"
+                        :disabled="true"
+                    />
+                    <!-- <Textarea v-model="activeRepeaterData.responseContent" rows="5" style="width: calc(100% - 10px);height: calc(100vh - 67px); border: 0; margin: 5px; background-color: var(--surface-100);" readonly /> -->
                     <!-- <textarea style="text-align: left;" v-model="activeRepeaterData" id="code-viewer" class="code-viewer"></textarea> -->
                 </SplitterPanel>
             </Splitter>
@@ -93,16 +111,11 @@ import ContextMenu from 'primevue/contextmenu';
 import SelectButton from 'primevue/selectbutton';
 import { useSessionStore } from '../stores/session';
 import Listbox from 'primevue/listbox';
-import Codemirror from "codemirror-editor-vue3";
-import "codemirror/addon/display/placeholder.js";
-import "codemirror/mode/javascript/javascript.js";
-import "codemirror/mode/http/http.js";
-import "codemirror/addon/display/placeholder.js";
-import "codemirror/theme/idea.css";
+import { Codemirror } from 'vue-codemirror'
 import TabMenu from 'primevue/tabmenu';
 import Textarea from 'primevue/textarea';
 import Toolbar from 'primevue/toolbar';
-
+import { EditorView } from '@codemirror/view';
 import { HTTPParser } from 'http-parser-js';
 
 
@@ -119,6 +132,11 @@ export default defineComponent({
             connection: null,
             isConnected: false,
             message: '',
+            codeMirrorOptions: {
+                extensions: [
+                    EditorView.lineWrapping
+                ]
+            },
             messages: [],
             columns: [
                 { prop: "id", name: "#", sortable: true, size: 50, columnType: 'numeric', cellCompare: this.naturalSort, order: 'asc'},
@@ -169,6 +187,7 @@ export default defineComponent({
         VCodeBlock,
         ContextMenu,
         Listbox,
+        Codemirror
     },
     setup() {
     },
@@ -224,8 +243,8 @@ export default defineComponent({
                 // this.repeaterRows.push({label: element.host + element.endpoint})
                 this.value = "Repeater"
             } else if(message.action == "repeaterUpdate") {
+                console.log(message.message)
                 message.message.forEach((element: any) => {
-                    // console.log(element);
                     var tmpData = element.method + " " + element.endpoint + "\n"
                     tmpData += JSON.parse(element.request_headers).join("\n")
                     // console.log(element);
@@ -243,11 +262,8 @@ export default defineComponent({
                     var tmpResponseContent = tmpData
                     this.repeaterRows.push({id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: element.id, element: element})
                 });
-                // console.log(this.activeRepeaterData);
                 this.activeRepeaterData = this.repeaterRows[0]
-                // this.repeaterRequestViewer.setValue(this.activeRepeaterData.requestContent)
-                // this.repeaterResponseViewer.setValue(this.activeRepeaterData.responseContent)
-                // console.log(this.activeRepeaterData);
+                console.log("Repeater update:", this.activeRepeaterData)
                 
             } else if(message.action === "replayUpdate") {
                 const element = message.replay;
@@ -268,7 +284,8 @@ export default defineComponent({
                 var tmpResponseContent = tmpData
                 var tmpUpdatedRequest = {id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: element.id, element: element}
                 this.activeRepeaterData = tmpUpdatedRequest;
-                this.repeaterRows[element.id] = tmpUpdatedRequest;
+                var index = this.repeaterRows.findIndex(obj => obj.id === element.id)
+                this.repeaterRows[index] = tmpUpdatedRequest 
             }
         };
 
@@ -329,10 +346,16 @@ export default defineComponent({
             tmpRepeaterPayload['response_headers'] = tmpRepeaterData.response_headers
             tmpRepeaterPayload['session_id'] = tmpRepeaterData.session_id
             console.log(tmpRepeaterPayload);
-            this.connection.send(JSON.stringify({'action': 'replayRequest', 'replay': tmpRepeaterPayload}))
+            var obj = {
+                'deviceId': localStorage.getItem('deviceId'),
+                'appName': localStorage.getItem('appName'),
+                'sessionId': localStorage.getItem('sessionId'),
+                'appId': localStorage.getItem('appId')
+            }
+            this.connection.send(JSON.stringify({'action': 'replayRequest', 'replay': tmpRepeaterPayload, 'appData': obj}))
         },
         changeRepeater(event: any) {
-            console.log(event.index);
+            console.log("Changed to Repeater");
             console.log(this.activeRepeaterData);
             this.activeRepeaterData = this.repeaterRows[event.index]
             // this.re
