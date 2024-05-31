@@ -4,6 +4,7 @@ import { readFileSync, existsSync } from "fs";
 import path from "path";
 import { WebSocket } from "ws";
 import DBManager from "./database";
+var dbManager = new DBManager('./data.db');
 
 class REPLManager {
     session: Session
@@ -61,6 +62,55 @@ class REPLManager {
         await script.load()
     }
 
+    async attach_script(code: string, payload: any, manager: any) {
+        const parentDir = path.join(__dirname, '..')
+        const filePath = parentDir + '/libraries/' + code;
+        console.log("Attach script payload:", payload);
+        const ID = payload.id;
+        if (existsSync(filePath)) {
+            const fileContent = readFileSync(filePath, 'utf8');
+            const script = await this.session.createScript(fileContent)
+            script.message.connect((message, data) => {
+                console.log("Script Message: " + message.type);
+                if(message.type === MessageType.Error) {
+                    const { columnNumber, description, fileName, lineNumber, stack } = message
+                    console.log(columnNumber, description, fileName, lineNumber, stack);
+                    this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": description, "fileName": fileName, "stack": stack, "line": lineNumber, "column": columnNumber}}))
+                } else {
+                    const { payload } = message
+                    var tmpJson = JSON.parse(payload);
+                    tmpJson['id'] = ID;
+                    console.log("Attach script updated payload: ", tmpJson);
+                    dbManager.updateReplayedRepeater(tmpJson, (updated: any) => {
+                        console.log("updated replayed request");
+                        console.log(updated);
+                        manager.broadcastData(JSON.stringify({'action': 'replayUpdate', 'replay': updated}))
+                   });
+                }
+                
+            })
+
+            script.destroyed.connect(() => {
+                console.log("Script destroyed");            
+            })
+
+            await script.load()
+            if (payload){
+                script.post({
+                    type: 'sendRequest',
+                    payload: { data: payload }
+                });
+            }
+
+            this.ws.send(JSON.stringify({'action':'successOutput', 'message': `${code} library attached!`}))
+        } else {
+            setTimeout(() => {
+                console.log("File doesn't exists");            
+                this.ws.send(JSON.stringify({'action':'scriptError', 'message': {'description': `${code} library not found!`}}))
+            }, 2000);
+        }
+
+    }
 
     async run_script(code: string) {
         console.log("Got request for executing code");
@@ -77,7 +127,6 @@ class REPLManager {
                     this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": description, "fileName": fileName, "stack": stack, "line": lineNumber, "column": columnNumber}}))
                 } else {
                     const { payload } = message
-                    console.log(payload);
                     var tmpJson = JSON.parse(payload);
                     if(Object.keys(tmpJson).indexOf("error") > -1) {
                         this.ws.send(JSON.stringify({'action':'scriptError', 'message':{"description": tmpJson['error']}}))

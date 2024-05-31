@@ -49,7 +49,7 @@
                                     <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
                                         <div class="card">
                                             <Toast />
-                                            <FileUpload name="demo[]" url="/api/upload" @upload="onTemplatedUpload($event)" :multiple="true" accept="application/javascript,text/javascript" :maxFileSize="1000000" @select="onSelectedFiles" style="width: 100%;">
+                                            <FileUpload name="demo[]" url="/api/upload" @upload="onTemplatedUpload($event)" :multiple="true" accept="application/javascript,text/javascript,text/plain" :maxFileSize="1000000" @select="onSelectedFiles" style="width: 100%;">
                                                 <template #header="{ chooseCallback, uploadCallback, clearCallback, files }">
                                                     <div class="flex flex-wrap justify-content-between align-items-center flex-1 gap-2" style="display: flex; justify-content: space-between;width: 100%;align-items: center">
                                                         <div class="flex gap-2">

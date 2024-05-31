@@ -93,6 +93,7 @@ export async function findProcesses(deviceId: string, appName: string) {
     console.log("Finding " + appName + " in processes");
     
     const processes = await device.enumerateProcesses({ scope: Scope.Full });
+    console.log("Processes: ", processes);
     var foundProcess = processes.filter(proc => {if(proc.name == appName){return {"name": proc.name, "pid": proc.pid}}});
     console.log(foundProcess);
     
@@ -161,12 +162,11 @@ export async function attachApp(deviceId: string, processID: number) {
     const filtered = devices.filter(dev => deviceId == dev.id);
     const device = filtered[0];
     // Changed code here for MDM
-    device.resume(processID)
-    setTimeout(test, 2000);
+    //await device.resume(processID)
     const session = await device.attach(processID)
     return session;
 }
 
-export function test(){
+export function timeoutFunc(){
     console.log(123);
 }

@@ -260,6 +260,7 @@ export default defineComponent({
                         localStorage.setItem("appId", message["appId"])
                         localStorage.setItem("appName", message["appName"])
                         localStorage.setItem("library", message["library"])
+                        localStorage.setItem("deviceId", message["deviceId"])
                         this.sess.$patch({app: {isConnected: true, name: message['appName'], identifier: message['appId'], status: message['message'], sessionId: message['sessionId'], deviceId: message['deviceId'], library: message['library']}})
                         this.ws.send(JSON.stringify({'action': 'detectLibraries', 'sessionId': this.connectionSessionId}))
                     } else {
@@ -268,6 +269,7 @@ export default defineComponent({
                         localStorage.setItem("appId", "")
                         localStorage.setItem("appName", "")
                         localStorage.setItem("library", "")
+                        localStorage.setItem("deviceId", "")
                     }
                 } else {
                     console.log("Old Session Got Disconnected: " + tmpSessionId + " | Current Session Id: " + this.connectionSessionId);  
