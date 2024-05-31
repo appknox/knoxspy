@@ -49,8 +49,6 @@ export default defineComponent({
     },
     methods: {
         toggleSidebar() {            
-            console.log("sidebar toggled");
-            
             this.isActive = !this.isActive;
         },
         restartApp() {
@@ -67,11 +65,12 @@ export default defineComponent({
         }
     },
     created() {
-        const sess = useSessionStore();
+        this.sess = useSessionStore()
+        console.log("updating sidebar" + this.sess.app.library);
         
 
         sess.$subscribe((mutation, state) => {
-            console.log(mutation.payload);
+            console.log("mutation", mutation.payload);
             
         })
 
@@ -93,17 +92,17 @@ export default defineComponent({
                     this.connectionStatus = message['message']
                     if(message['message'] === "Connected") {
                         this.isConnected = true;
-                        localStorage.setItem("appId", message["appId"])
-                        localStorage.setItem("appName", message["appName"])
-                        localStorage.setItem("library", message["library"])
-                        localStorage.setItem("deviceId", message["deviceId"])
+                        // localStorage.setItem("appId", message["appId"])
+                        // localStorage.setItem("appName", message["appName"])
+                        // localStorage.setItem("library", message["library"])
+                        // localStorage.setItem("deviceId", message["deviceId"])
                     } else {
                     this.connectionAppName = ``
                         this.isConnected = false;
-                        localStorage.setItem("appId", "")
-                        localStorage.setItem("appName", "")
-                        localStorage.setItem("library", "")
-                        localStorage.setItem("deviceId", "")
+                        // localStorage.setItem("appId", "")
+                        // localStorage.setItem("appName", "")
+                        // localStorage.setItem("library", "")
+                        // localStorage.setItem("deviceId", "")
                     }
                 } else {
                     console.log("Old Session Got Disconnected: " + tmpSessionId + " | Current Session Id: " + this.connectionSessionId);  

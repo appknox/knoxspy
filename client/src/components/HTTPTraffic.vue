@@ -2,15 +2,15 @@
     <div class="page">
         <!-- <v-grid :source="rows" :columns="columns" /> -->
         <div style="display: flex; align-items: center; border-bottom: 1px solid #eee; position: relative;">
-            <SelectButton v-model="value" :options="options" aria-labelledby="basic" style="position: absolute; left: 30px; top: 8px; z-index: 1000; text-align: center"/>
+            <SelectButton v-model="value" :options="options" :allow-empty="false" aria-labelledby="basic" style="position: absolute; left: 30px; top: 8px; z-index: 1000; text-align: center"/>
 
             <!-- <SelectButton v-model="value" :options="options" aria-labelledby="basic" style="margin-left: 30px; margin-right: 30px; padding: 5px"/> -->
         </div>
 
-        <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 0px)" layout="vertical">
+        <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 0px)" layout="vertical" v-on:resize="resizedSplitter">
             <SplitterPanel class="flex align-items-center justify-content-center" :size="60">
                 <ContextMenu ref="cm" :model="menuModel" />
-                <DataTable style="" contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable scroll-height="100vh" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']" size="small">
+                <DataTable style="" contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable v-bind:scroll-height="dataTableHeight" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']" size="small">
                     <template #header :style="{'margin':0, 'padding':0}" class="traffic-header" :class="{'hidden1': visibleTrafficHeader}">
                         <div class="traffic-header-inner flex justify-content-end" style="display: flex; justify-content: end; gap: 10px" :style="{'display': visibleTrafficHeader ? 'flex': 'flex'}" v-shortkey="['meta', 'f']" @shortkey.native="toggleTrafficHeader">
                             
@@ -39,7 +39,6 @@
                             lang="http"
                             theme="vs"
                             style="text-align: left; word-wrap: break-word; text-wrap: wrap"
-                            :extensions="extensions"
                         />
                     </SplitterPanel>
                     <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
@@ -57,7 +56,7 @@
         </Splitter>
     
         <div v-if="value == 'Repeater'">
-            <TabMenu v-if="value == 'Repeater'" v-model:activeIndex="activeRepeaterTab" :model="repeaterRows" @tab-change="changeRepeater" style="padding-left: 230px; padding-right: 130px;"/>
+            <TabMenu :scrollable="true" v-if="value == 'Repeater'" v-model:activeIndex="activeRepeaterTab" :model="repeaterRows" @tab-change="changeRepeater" style="padding-left: 230px; padding-right: 130px;"/>
             <Splitter class="repeater-viewer-split">
                 <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
                     <codemirror
@@ -86,7 +85,7 @@
                     <!-- <textarea style="text-align: left;" v-model="activeRepeaterData" id="code-viewer" class="code-viewer"></textarea> -->
                 </SplitterPanel>
             </Splitter>
-            <Button label="Replay" style="position: fixed; top: 7px; right: 10px;" icon="pi pi-send" @click="replayRequest" />
+            <Button label="Replay" style="position: fixed; top: 7px; right: 10px;" icon="pi pi-send" @click="replayRequest"  v-shortkey="['meta', 'd']" @shortkey.native="replayRequest" />
         </div>
 
     </div>
@@ -123,6 +122,7 @@ export default defineComponent({
     name: 'App',
     data() {
         return {
+            dataTableHeight: "calc(60vh - 50px)",
             activeRepeaterTab: 0,
             activeRepeaterData: "",
             selectedRepeaterTab: null,
@@ -301,6 +301,11 @@ export default defineComponent({
     updated() {
     },
     methods: {
+        resizedSplitter(event) {
+            console.log("Resizing");
+            console.log(event.sizes);
+            this.dataTableHeight = `calc(${event.sizes[0]}vh - 55px)`;
+        },
         parseRequest(requestData: string) {
             const lines = requestData.split('\n');
             const [method, path] = lines[0].split(' ');

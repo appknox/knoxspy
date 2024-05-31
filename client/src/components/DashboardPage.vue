@@ -77,7 +77,6 @@ export default defineComponent({
     created() {
         this.sess = useSessionStore()
         
-        
 
         const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.ws = new WebSocket(url);

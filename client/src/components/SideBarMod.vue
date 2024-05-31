@@ -11,14 +11,22 @@
             <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isActive}">Library Manager</span></router-link></li>
         </ul>
         <div class="app-info" :class="isActive ? '' : 'closed'">
-            <p class="app-message" type="connected">{{connectionStatus}}<span>{{ connectionAppName }}</span></p>
-            <div class="app-info-button-group-wrapper">
+            <p class="app-message" type="connected">{{status}}<span>{{ name }}</span></p>
+            <div class="app-info-button-group-wrapper" style="display: none;">
                 <div class="app-info-button-group">
                     <Button icon="pi pi-refresh" @click="restartApp" style="margin-right: 10px;" severity="success" rounded text />
                     <Button icon="pi pi-times" disabled severity="danger" rounded text/>
                 </div>
             </div>
         </div>
+        <!-- <SpeedDial @show="toggleSpeeddial" @hide="toggleSpeeddial" :model="speeddial_menu" direction="left" style="box-shadow: 0 10px 15px -10px #aaa;position: fixed; bottom: 30px; right: 30px;border-radius: 50px;" id="speeddial_menu" :style="{backgroundColor: speedMenuBackground}">
+            <template #item="{ item }" style="background-color: red;">
+                <Button :key="item.label" :icon="item.icon" class="speeddial-buttons" link style="text-decoration: none; width: auto;">
+                    <span style="width: 120px;"><i :class="item.icon" style="margin-right: 5px;"></i>{{ item.label }}</span>
+                </Button>
+            </template>
+        </SpeedDial> -->
+
     </div>
 </template>
 
@@ -29,30 +37,56 @@ import Button from "primevue/button";
 import Toolbar from "primevue/toolbar";
 import ToggleButton from "primevue/togglebutton";
 import { useSessionStore } from "../stores/session";
+import SpeedDial from "primevue/speeddial";
 
 export default defineComponent({
 	name: 'SideBar',
     data() {
         return {
+            speedMenuBackground: "#fff0",
             ws: null,
             isConnected: false,
-            connectionStatus: "Not Connected",
-            connectionAppName: null,
-            connectionAppIdentifier: null,
-            connectionDeviceId: null,
-            connectionLibrary: null,
+            status: "Not Connected",
+            name: null,
+            identifier: null,
+            deviceId: null,
+            library: null,
             isActive: false,
-            connectionSessionId: -1,
-            sess: null
+            sessionId: -1,
+            sess: null,
+            speeddial_menu: [
+                {
+                    label: 'Add',
+                    icon: 'pi pi-pencil',
+                    command: () => {
+                    }
+                },
+                {
+                    label: 'Update',
+                    icon: 'pi pi-refresh',
+                    command: () => {
+                    }
+                },
+                {
+                    label: 'Delete',
+                    icon: 'pi pi-trash',
+                    command: () => {
+                    }
+                },
+            ]
         }
     },
     components: {
+        SpeedDial,
         Message,
         Button,
         Toolbar,
         ToggleButton
     },
     methods: {
+        toggleSpeeddial() {
+            this.speedMenuBackground = this.speedMenuBackground == "#fff0" ? "#ffff" : "#fff0";
+        },
         toggleSidebar() {            
             this.isActive = !this.isActive;
         },
@@ -67,16 +101,23 @@ export default defineComponent({
         this.sess.$subscribe((mutation, state) => {
             if(mutation.type === 'patch object') {
                 if('app' in mutation.payload) {
-                    console.log(mutation.payload);
                     const appConnectionObj = mutation.payload.app;
+                    for(var element in appConnectionObj) {
+                        this[element] = appConnectionObj[element];
+                        console.log(element, this[element], appConnectionObj[element]);
+                        
+                    }
+                    
+                    
+                    console.log("Mutation", mutation.payload);
                     console.log(appConnectionObj);
-                    this.isConnected = appConnectionObj.isConnected;
-                    this.connectionAppName = appConnectionObj.name;
-                    this.connectionStatus = appConnectionObj.status;
-                    this.connectionSessionId = appConnectionObj.sessionId;
-                    this.connectionAppIdentifier = appConnectionObj.identifier;
-                    this.connectionDeviceId = appConnectionObj.deviceId;
-                    this.connectionLibrary = appConnectionObj.library;
+                    // this.isConnected = appConnectionObj.isConnected;
+                    // this.connectionAppName = appConnectionObj.name;
+                    // this.connectionStatus = appConnectionObj.status;
+                    // this.connectionSessionId = appConnectionObj.sessionId;
+                    // this.connectionAppIdentifier = appConnectionObj.identifier;
+                    // this.connectionDeviceId = appConnectionObj.deviceId;
+                    // this.connectionLibrary = appConnectionObj.library;
                 }
             }
         });
@@ -85,6 +126,22 @@ export default defineComponent({
 </script>
 
 <style scoped>
+#speeddial_menu {
+    
+}
+.p-speeddial {
+    width: 0;
+}
+.p-speeddial-list {
+    background-color: red;
+}
+.speeddial-buttons {
+    transition: all linear .2s;
+}
+.speeddial-buttons:hover {
+    background-color: #eeea;
+    border-radius: 50px;
+}
 .sidebar {
     display: flex;
     flex-direction: column;

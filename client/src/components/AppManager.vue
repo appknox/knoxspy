@@ -8,15 +8,17 @@
                     <div class="section-header-device">
                         <h4>Apps For</h4>
                         <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" />
-                    
+                        <Button icon="pi pi-refresh" rounded aria-label="Filter" label="Refresh" @click="refreshDevices" />
+
+                    </div>
+                    <div style="display: flex; gap: 10px; position: relative;">
+
                         <div class="section-header-search">
                             <IconField iconPosition="left">
                                 <InputIcon class="pi pi-search"> </InputIcon>
                                 <InputText v-model="appSearch" placeholder="Search Apps" :onKeydown="searchApp" />
                             </IconField>
                         </div>
-                    </div>
-                    <div style="display: flex; gap: 5px; position: relative;">
                         <Dropdown style="display: flex; " v-model="selectedLibrary" :options="libraryList" optionLabel="name" placeholder="Select a Library" class="w-full md:w-14rem">
                             <template #value="slotProps">
                                 <div v-if="slotProps.value" class="flex align-items-center">
@@ -39,6 +41,10 @@
                 <div v-if="selectedDevice == null" style="display: flex; width: 100%; height: calc(100vh - 65px); justify-content: center; align-items: center; flex-direction: column;">
                     <i style="font-size: 40px; color: var(--surface-500);" class="pi pi-info-circle"></i>
                     <p style="font: 25px 'Fira Code'; color: var(--surface-500)">No Device Selected!</p>
+                </div>
+                <div v-if="apps == null" style="display: flex; width: 100%; height: calc(100vh - 65px); justify-content: center; align-items: center; flex-direction: column;">
+                    <i class="pi pi-sync pi-spin" style="font-size: 40px; color: var(--surface-500);"></i>
+                    <p style="font: 25px 'Fira Code'; color: var(--surface-500)">Loading Apps</p>
                 </div>
                 <ul class="app-list" v-if="data">
                     <ContextMenu ref="menu" :model="appMenu" />
@@ -195,6 +201,13 @@ export default defineComponent({
             this.$router.push({name: 'Dashboard'})
         }
 
+
+        this.isConnected = this.sess.app.isConnected;
+        this.connectionAppName = this.sess.app.name;
+        this.selectedLibrary = this.sess.app.library;
+        console.log("library: ", this.sess.app.library);
+        
+
         this.sess.$onAction(({ name, store, args, after, onError }) => {
             console.log(`Action called: ${name}`)
             console.log('Arguments:', args)
@@ -227,12 +240,12 @@ export default defineComponent({
 
         this.ws.onmessage = (event: { data: string; }) => {
             const message = JSON.parse(event.data);
-            console.log("New Message");
-            console.log(message);
+            // console.log("New Message");
+            // console.log(message);
             
             
             if(message['action'] === 'devices') {
-                console.log(message);
+                // console.log(message);
                 
                 for(const a in message['devices']) {
                     const b = message['devices'][a];
@@ -303,6 +316,10 @@ export default defineComponent({
         };
     },
     methods: {
+        refreshDevices() {
+            const json = {"action":"devices"}
+            this.ws.send(JSON.stringify(json))
+        },
         rightClickHandler(type: string) {
             if(type === 'spawn') {
                 console.log("Spawning | " + this.rightClickMenuApp + " | " + this.rightClickMenuIdentifier);                
@@ -319,6 +336,9 @@ export default defineComponent({
             this.$refs.menu.show(event);
         },
         setLibrary() {
+            this.sess.$patch({app: {library: this.selectedLibrary}})
+            console.log(this.sess.app);
+            
             if(this.isConnected) {
                 this.ws.send(JSON.stringify({'action': 'changeLibrary', 'library': this.selectedLibrary, 'sessionId': this.connectionSessionId}))
             }
@@ -330,13 +350,13 @@ export default defineComponent({
             this.$toast.add({ severity: type, summary: header, detail: message});
         },
         async fetchApps() {
-            console.log(this.selectedDevice);
+            // console.log(this.selectedDevice);
             const json = {"action":"apps", "deviceId": this.selectedDevice}
             this.ws.send(JSON.stringify(json))
         },
         async startApp(identifier: string, name: string) {
             this.selectedApp = identifier
-            console.log(this.selectedDevice);
+            // console.log(this.selectedDevice);
             const sessionId = Math.floor(Math.random() * 100000);
             this.connectionSessionId = sessionId
             localStorage.setItem("sessionId", ""+sessionId)
@@ -346,7 +366,7 @@ export default defineComponent({
         },
         async attachApp(identifier: string, name: string) {
             this.selectedApp = identifier
-            console.log(this.selectedDevice);
+            // console.log(this.selectedDevice);
             const sessionId = Math.floor(Math.random() * 100000);
             this.connectionSessionId = sessionId
             localStorage.setItem("sessionId", ""+sessionId)
