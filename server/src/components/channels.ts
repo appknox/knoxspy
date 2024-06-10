@@ -1,5 +1,6 @@
 import * as frida from 'frida';
 import WebSocket from 'ws';
+import WebSocketManager from './websocket';
 
 const mgr = frida.getDeviceManager()
 
@@ -11,14 +12,16 @@ export default class Channels {
     appId: string
     library: string
     deviceId: string
+    ws: WebSocketManager
 
-    constructor(session: frida.Session, name: string, sessionId: number, appId: string, library: string, deviceId: string, processID: number = -1) {
+    constructor(session: frida.Session, name: string, sessionId: number, appId: string, library: string, deviceId: string, ws: WebSocketManager, processID: number = -1) {
         this.session = session
         this.name = name
         this.sessionId = sessionId
         this.appId = appId
         this.library = library
         this.deviceId = deviceId
+        this.ws = ws
         console.log("Channel has been setup!");
     }
 
@@ -34,11 +37,12 @@ export default class Channels {
         this.changedSignal = this.onchange.bind(this)
         mgr.changed.connect(this.changedSignal)
 
-        const ws = new WebSocket('ws://localhost:8000')
-        ws.on('open', () => {
-            console.log("Channel connected to the ws server!");
-            ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Connected', 'appName': this.name, 'sessionId': this.sessionId, "appId": this.appId, "library": this.library, "deviceId": this.deviceId}));
-        })
+        this.ws.broadcastData(JSON.stringify({'action':'deviceUpdate', 'message':'Connected', 'appName': this.name, 'sessionId': this.sessionId, "appId": this.appId, "library": this.library, "deviceId": this.deviceId}));
+        // const ws = new WebSocket('ws://localhost:8000')
+        // ws.on('open', () => {
+        //     console.log("Channel connected to the ws server!");
+        //     ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Connected', 'appName': this.name, 'sessionId': this.sessionId, "appId": this.appId, "library": this.library, "deviceId": this.deviceId}));
+        // })
 
 
         let dev: frida.Device
@@ -48,7 +52,7 @@ export default class Channels {
             console.log("Disconnected")
             console.log(reason);
             
-            ws.send(JSON.stringify({'action':'deviceUpdate', 'message':'Disconnected', 'appName': this.name, 'sessionId': this.sessionId, "appId": this.appId, "library": this.library, "deviceId": this.deviceId}));
+            this.ws.broadcastData(JSON.stringify({'action':'deviceUpdate', 'message':'Disconnected', 'appName': this.name, 'sessionId': this.sessionId, "appId": this.appId, "library": this.library, "deviceId": this.deviceId}));
         })
     }
 }

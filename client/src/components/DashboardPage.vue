@@ -7,14 +7,15 @@
                 <h2 style="border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 0">Sessions</h2>
             </template>
             <template #content>
-                <Message severity="info" v-if="isSessionActive">
+                <Message severity="info" v-if="isSessionActive" :closable="false">
                     <template #messageicon>
-                        <i class="pi pi-cog" style="margin-right: 10px;"></i>
+                        <i class="pi pi-info-circle" style="margin-right: 10px;"></i>
                     </template>
-                    <span class="ml-2"><b>'{{sess.session.name}}'</b> session is currently in use!</span>
+                    <span class="ml-2" style="line-height: 38px;"><b>'{{sess.session.name}}'</b> session is currently in use!</span>
+                    <Button severity="danger" label="Disconnect" text style="margin-left: 20px;" @click="clearActiveSession"/>
                     <!-- <Button severity="danger" label="Disconnect"/> -->
                 </Message>
-                <div style="display: flex; align-items: start;">
+                <div style="display: flex; align-items: start; border-radius: 10px" id="sessionSelection" :class="isSessionActive ? 'disabled' : ''">
                     <div style="display: flex; flex-direction: column; flex-grow: 1; flex-basis: 0; padding: 20px; ">
                         <p class="m-0">
                             Create A New Session
@@ -105,9 +106,13 @@ export default defineComponent({
                 if(message['session'].name != null) {
                     // console.log(this.sess.session);
                     this.isSessionActive = true
+                    this.newSessionName = ""
+                    this.selectedSession = ""
                 }
-                //this.$router.push({path: '/traffic'})
+                // this.$router.push({path: '/libraries'})
                 
+            } else if( message['action'] === "clearActiveSession") {
+                this.isSessionActive = message['status']
             }
         };
 
@@ -117,9 +122,14 @@ export default defineComponent({
 
         this.ws.onclose = () => {
             console.log('WebSocket connection closed');
+            
+            this.sess.$patch({app: {isConnected: false}})
         };
     },
     methods: {
+        clearActiveSession() {
+            this.ws.send(JSON.stringify({'action': 'clearActiveSession'}))
+        },
         createNewSession() {
             this.ws.send(JSON.stringify({'action': 'createNewSession', 'name': this.newSessionName}))
         },
@@ -132,6 +142,21 @@ export default defineComponent({
 });
 </script>
 <style>
+#sessionSelection {
+    position: relative;
+}
+#sessionSelection.disabled::before {
+    border-radius: 10px;
+    position: absolute;
+    left: 0;
+    top: 0;
+    background-color: #aaa3;
+    z-index: 800;
+    display: block;
+    content: '';
+    height: 100%;
+    width: 100%;
+}
 .page-dashboard {
     width: 100%;
     height: 100vh !important;

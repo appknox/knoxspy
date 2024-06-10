@@ -86,16 +86,25 @@ export async function findDevices() {
 }
 
 export async function findProcesses(deviceId: string, appName: string) {
+    // console.log("searching for", deviceId);
+    
     const mgr = frida.getDeviceManager()
     const devices = await mgr.enumerateDevices();
     const filtered = devices.filter(dev => deviceId == dev.id);
     const device = filtered[0];
-    console.log("Finding " + appName + " in processes");
+    // console.log("Finding " + appName + " in processes");
     
     const processes = await device.enumerateProcesses({ scope: Scope.Full });
-    console.log("Processes: ", processes);
-    var foundProcess = processes.filter(proc => {if(proc.name == appName){return {"name": proc.name, "pid": proc.pid}}});
-    console.log(foundProcess);
+    // console.log("Processes: ", processes);
+    // console.log("Found processes:", processes);
+    
+    var foundProcess:any = [];
+    if(appName.trim() !== "") {
+        foundProcess = processes.filter(proc => {if(proc.name == appName){return {"name": proc.name, "pid": proc.pid}}});
+    } else {
+        foundProcess = processes.filter(proc => {return {"name": proc.name, "pid": proc.pid}});
+    }
+    // console.log(foundProcess);
     
     return foundProcess;
 }
@@ -106,6 +115,7 @@ export async function findApps(deviceId: string) {
     try {
         const mgr = frida.getDeviceManager()
         const devices = await mgr.enumerateDevices();
+        // const devices = await findDevices();
         const filtered = devices.filter(dev => deviceId == dev.id);
         
         // console.log(filtered);
@@ -126,12 +136,13 @@ export async function findApps(deviceId: string) {
         filteredApplications.sort(compareByType)
     } catch (e: any) {
         console.log((e as Error).message);
-        console.log(Object.keys(e));
+        // console.log(Object.keys(e));
         
         error = (e as Error).message;
     }
     return [filteredApplications, error];
 }
+
 function compareByType(a: any, b: any) {
     // 'user' comes before 'system_dev'
     if (a.type === 'user' && b.type !== 'user') {
@@ -144,19 +155,39 @@ function compareByType(a: any, b: any) {
     }
 }
 
+interface startAppOutput {
+    status: boolean
+    output: frida.Session | string | null
+}
+
 export async function startApp(deviceId: string, appId: string) {
-    const mgr = frida.getDeviceManager()
-    const devices = await mgr.enumerateDevices();
-    const filtered = devices.filter(dev => deviceId == dev.id);
-    const device = filtered[0];
-    const pid = await device.spawn(appId)
-    device.resume(pid)
-    const session = await device.attach(pid)
-    return session;
+    var tmpOutput:startAppOutput = {status: false, output: null};
+    try {
+        const mgr = frida.getDeviceManager()
+        const devices = await mgr.enumerateDevices();
+        // console.log(appId, deviceId);
+        
+        const filtered = devices.filter(dev => deviceId == dev.id);
+        // console.log(filtered);
+        const device = filtered[0];
+        // console.log(device);
+        
+        const pid = await device.spawn(appId)
+        device.resume(pid)
+        const session = await device.attach(pid)
+        tmpOutput.output = session;
+        tmpOutput.status = true;
+    } catch (e: any) {
+        console.log("Error:", e);
+        
+        tmpOutput.output = "Error while starting app: " + e;
+        tmpOutput.status = false;
+    }
+    return tmpOutput;
 }
 
 export async function attachApp(deviceId: string, processID: number) {
-    console.log(deviceId,processID)
+    // console.log(deviceId,processID)
     const mgr = frida.getDeviceManager()
     const devices = await mgr.enumerateDevices();
     const filtered = devices.filter(dev => deviceId == dev.id);

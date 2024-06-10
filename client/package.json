@@ -12,6 +12,7 @@
     "@revolist/vue-datagrid": "^4.7.0-next.2",
     "@revolist/vue3-datagrid": "^4.0.0-next.1",
     "@wdns/vue-code-block": "^2.3.2",
+    "axios": "^1.7.2",
     "codemirror": "^6.0.1",
     "highlight.js": "^11.9.0",
     "http-message-parser": "^0.0.34",
@@ -28,6 +29,8 @@
     "yarn": "^1.22.22"
   },
   "devDependencies": {
+    "@codemirror/language": "^6.10.1",
+    "@codemirror/legacy-modes": "^6.4.0",
     "@types/node": "^20.12.12",
     "@types/prismjs": "^1.26.4",
     "@vitejs/plugin-vue": "^5.0.4",

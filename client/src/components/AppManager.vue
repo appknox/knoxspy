@@ -1,13 +1,32 @@
 <template>
 	<div class="page">
         <Toast />
-
+        <ConfirmDialog></ConfirmDialog>
         <div class="section-group">
             <div class="section section-apps">
                 <div class="section-header">
                     <div class="section-header-device">
                         <h4>Apps For</h4>
-                        <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" />
+                        <!-- <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" /> -->
+                        <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value">
+                            <template #value="slotProps">
+                                <div v-if="slotProps.value" class="flex align-items-center">
+                                    <div v-if="slotProps.value.platform === 'iOS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.value.name }}</div>
+                                    <div v-if="slotProps.value.platform === 'Android'"><i style="margin-right: 5px;" class="pi pi-android"></i>{{ slotProps.value.name }}</div>
+                                    <div v-if="slotProps.value.platform === 'unknown'"><i style="margin-right: 5px;" class="pi pi-times"></i>{{ slotProps.value.name }}</div>
+                                </div>
+                                <span v-else>
+                                    {{ slotProps.placeholder }}
+                                </span>
+                            </template>
+                            <template #option="slotProps">
+                                <div class="flex align-items-center">
+                                    <div v-if="slotProps.option.platform === 'iOS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.option.name }}</div>
+                                    <div v-if="slotProps.option.platform === 'Android'"><i style="margin-right: 5px;" class="pi pi-android"></i>{{ slotProps.option.name }}</div>
+                                    <div v-if="slotProps.option.platform === 'unknown'"><i style="margin-right: 5px;" class="pi pi-times"></i>{{ slotProps.option.name }}</div>
+                                </div>
+                            </template>
+                        </Dropdown>
                         <Button icon="pi pi-refresh" rounded aria-label="Filter" label="Refresh" @click="refreshDevices" />
 
                     </div>
@@ -58,7 +77,7 @@
                         <template #content>
                             <i class="pi pi-info-circle" style="font-size: 35px; margin-bottom: 20px"></i>
                             <p class="m-0">
-                                {{isSpawned ? 'Connected' : 'Attached'}} to <t style="display: block;">'{{ connectionAppName }}'</t> App!
+                                {{isSpawned ? 'Connected' : 'Attached'}} to <t style="display: block; margin-bottom: 30px;">'{{ connectionAppName }}'</t>
                                 <!-- <AutoComplete style="display: block;" v-model="selectedLibrary" optionLabel="name" :suggestions="filteredLibraryList" @complete="search" /> -->
                                 
                                 <div style="display: flex; justify-content: center; align-items: center; gap: 10px" class="auto-detect-library-wrapper">
@@ -202,7 +221,7 @@ export default defineComponent({
         }
 
 
-        this.isConnected = this.sess.app.isConnected;
+        // this.isConnected = this.sess.app.isConnected;
         this.connectionAppName = this.sess.app.name;
         this.selectedLibrary = this.sess.app.library;
         console.log("library: ", this.sess.app.library);
@@ -246,13 +265,28 @@ export default defineComponent({
             
             if(message['action'] === 'devices') {
                 // console.log(message);
-                
+                this.data = []
                 for(const a in message['devices']) {
                     const b = message['devices'][a];
-                    this.data.push({"name": b.name, "value": b.id});
+                    console.log("New Device List:", {"name": b.name, "value": b.id, "platform": b.platform, 'id': b.id});
+                    
+                    this.data.push({"name": b.name, "value": b.id, "platform": b.platform, 'id': b.id});
                 }
-                if(this.data.length == 1) {
-                    this.selectedDevice = message['devices'][0].id
+                if(this.sess.app.deviceId != null && this.sess.app.deviceId.trim() !== "") {
+                    const tmpDevice = message.devices.filter((item) => {if(item.id == this.sess.app.deviceId) {return item;}})
+                    if(tmpDevice.length > 0) {
+                        console.log("Found previous device:", tmpDevice);
+                        this.selectedDevice = tmpDevice[0]
+                        this.fetchApps()
+                    } else {
+                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Previously attached device got disconnected!', life: 3000 });
+                    }
+                    
+                } else if(this.data.length == 1) {
+                    // console.log("New Device:", message['devices'][0]);
+                    
+                    this.selectedDevice = message['devices'][0]
+                    this.sess.$patch({app: {deviceId: this.selectedDevice.id}})
                     this.fetchApps()
                 }
             } else if(message['action'] === 'apps') {
@@ -313,6 +347,7 @@ export default defineComponent({
         this.ws.onclose = () => {
             this.isConnected = false;
             console.log('WebSocket connection closed');
+            this.sess.$patch({app: {isConnected: false}})
         };
     },
     methods: {
@@ -350,8 +385,9 @@ export default defineComponent({
             this.$toast.add({ severity: type, summary: header, detail: message});
         },
         async fetchApps() {
-            // console.log(this.selectedDevice);
-            const json = {"action":"apps", "deviceId": this.selectedDevice}
+            console.log("Fetching apps", this.selectedDevice);
+            this.sess.$patch({app: {deviceId: this.selectedDevice.id, platform: this.selectedDevice.platform}})
+            const json = {"action":"apps", "deviceId": this.selectedDevice.id}
             this.ws.send(JSON.stringify(json))
         },
         async startApp(identifier: string, name: string) {
@@ -361,7 +397,7 @@ export default defineComponent({
             this.connectionSessionId = sessionId
             localStorage.setItem("sessionId", ""+sessionId)
             const library = this.selectedLibrary !== null ? this.selectedLibrary.file : null
-            const json = {"action":"startApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
+            const json = {"action":"startApp", "deviceId": this.selectedDevice.id, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
             this.ws.send(JSON.stringify(json))
         },
         async attachApp(identifier: string, name: string) {
@@ -371,7 +407,7 @@ export default defineComponent({
             this.connectionSessionId = sessionId
             localStorage.setItem("sessionId", ""+sessionId)
             const library = this.selectedLibrary !== null ? this.selectedLibrary.file : null
-            const json = {"action":"attachApp", "deviceId": this.selectedDevice, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
+            const json = {"action":"attachApp", "deviceId": this.selectedDevice.id, "appId": identifier, 'appName': name, 'sessionId': sessionId, 'library': library}
             this.ws.send(JSON.stringify(json))
         },
         searchApp() {

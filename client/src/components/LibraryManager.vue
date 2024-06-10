@@ -1,7 +1,7 @@
 <template>
 	<div class="page page-library-manager">
         <h1>Library Manager</h1>
-        <TabView style="width: 1000px; margin: 0 auto;">
+        <TabView style="width: 1000px; margin: 0 auto;" :activeIndex="tabViewActiveIndex" @update:activeIndex="onTabViewChange">
             <TabPanel>
                 <template #header>
                     <div class="flex align-items-center gap-2">
@@ -42,14 +42,48 @@
                     </div>
                 </template>
                 <p class="m-0">
-                    <Stepper linear>
-                        <StepperPanel header="Upload File" style="height: 400px;">
+                    <Stepper linear @step-change="onStepperChanged" v-model:activeStep="stepperActiveIndex">
+                        <StepperPanel header="Configuration" style="height: 400px;">
                             <template #content="{ nextCallback }">
                                 <div class="flex flex-column h-12rem">
                                     <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
                                         <div class="card">
+                                            <FloatLabel style="width: 400px; margin: 30px auto 30px;">
+                                                <InputText id="username" v-model="libraryNameValue" style="width: 350px;" @input="changeSelectedPlatform"/>
+                                                <label for="username" style="width: 350px;">Library Name</label>
+                                            </FloatLabel>
+                                            <Dropdown style="width: 350px;" v-model="selectedPlatform" @change="changeSelectedPlatform" :options="platforms" optionLabel="name" placeholder="Select a Platform" class="w-full md:w-14rem">
+                                                <template #value="slotProps">
+                                                    <div v-if="slotProps.value" class="flex align-items-center">
+                                                        <div><i :class="slotProps.value.icon" style="margin-right: 5px;"></i>{{ slotProps.value.name }}</div>
+                                                    </div>
+                                                    <span v-else>
+                                                        {{ slotProps.placeholder }}
+                                                    </span>
+                                                </template>
+                                                <template #option="slotProps">
+                                                    <div class="flex align-items-center">
+                                                        
+                                                        <div><i :class="slotProps.option.icon" style="margin-right: 5px;"></i>{{ slotProps.option.name }}</div>
+                                                    </div>
+                                                </template>
+                                            </Dropdown>
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex pt-4 justify-content-end" style="margin-top: 20px;">
+                                    <Button :disabled="isNextButtonDisabled" label="Next" icon="pi pi-arrow-right" iconPos="right" @click="nextCallback" />
+                                </div>
+                            </template>
+                        </StepperPanel>
+                        <StepperPanel header="Upload ZIP File" style="height: 400px;">
+                            <template #content="{ prevCallback, nextCallback }">
+                                <div class="flex flex-column h-12rem">
+                                    <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
+                                        <div class="card">
                                             <Toast />
-                                            <FileUpload name="demo[]" url="/api/upload" @upload="onTemplatedUpload($event)" :multiple="true" accept="application/javascript,text/javascript,text/plain" :maxFileSize="1000000" @select="onSelectedFiles" style="width: 100%;">
+                                            <FileUpload name="demo[]" url="http://192.168.29.203:8000/api/upload" @upload="onTemplatedUpload($event)" :multiple="true" accept="application/zip" :maxFileSize="100000000" @select="onSelectedFiles" style="width: 100%;">
                                                 <template #header="{ chooseCallback, uploadCallback, clearCallback, files }">
                                                     <div class="flex flex-wrap justify-content-between align-items-center flex-1 gap-2" style="display: flex; justify-content: space-between;width: 100%;align-items: center">
                                                         <div class="flex gap-2">
@@ -68,12 +102,11 @@
                                                         <div class="flex flex-wrap p-0 sm:p-5 gap-5">
                                                             <div v-for="(file, index) of files" :key="file.name + file.type + file.size" class="card m-0 px-6 flex flex-column border-1 surface-border align-items-center gap-3">
                                                                 <div>
-                                                                    <img role="presentation" :alt="file.name" :src="file.objectURL" width="100" height="50" />
-                                                                </div>
+                                                                    <i class="pi pi-file-import" style="font-size: 45px; padding: 20px; color: #f97316"></i>
+                                                                </div> 
                                                                 <span class="font-semibold">{{ file.name }}</span>
                                                                 <div>{{ formatSize(file.size) }}</div>
-                                                                <Badge value="Pending" severity="warning" />
-                                                                <Button icon="pi pi-times" @click="onRemoveTemplatingFile(file, removeFileCallback, index)" outlined rounded  severity="danger" />
+                                                                <Button style="margin-top: 20px;" icon="pi pi-times" @click="onRemoveTemplatingFile(file, removeFileCallback, index)" outlined rounded  severity="danger" />
                                                             </div>
                                                         </div>
                                                     </div>
@@ -83,12 +116,11 @@
                                                         <div class="flex flex-wrap p-0 sm:p-5 gap-5">
                                                             <div v-for="(file, index) of uploadedFiles" :key="file.name + file.type + file.size" class="card m-0 px-6 flex flex-column border-1 surface-border align-items-center gap-3">
                                                                 <div>
-                                                                    <img role="presentation" :alt="file.name" :src="file.objectURL" width="100" height="50" />
+                                                                    <i class="pi pi-file-plus" style="font-size: 45px; padding: 20px; color: var(--green-700)"></i>
                                                                 </div>
                                                                 <span class="font-semibold">{{ file.name }}</span>
                                                                 <div>{{ formatSize(file.size) }}</div>
-                                                                <Badge value="Completed" class="mt-3" severity="success" />
-                                                                <Button icon="pi pi-times" @click="removeUploadedFileCallback(index)" outlined rounded  severity="danger" />
+                                                                <Button style="margin-top: 20px;" icon="pi pi-times" @click="removeUploadedFileCallback(index)" outlined rounded  severity="danger" />
                                                             </div>
                                                         </div>
                                                     </div>
@@ -103,29 +135,27 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="flex pt-4 justify-content-end" style="margin-top: 20px;">
-                                    <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="nextCallback" />
+                                <div class="flex pt-4 justify-content-between" style="margin-top: 20px;">
+                                    <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="prevCallback" style="margin-right: 10px;"/>
+                                    <Button :disabled="isNextButtonDisabled" label="Next" icon="pi pi-arrow-right" iconPos="right" @click="nextCallback" />
                                 </div>
                             </template>
                         </StepperPanel>
-                        <StepperPanel header="Platform Selection" style="height: 400px;">
-                            <template #content="{ prevCallback, nextCallback }">
-                                <div class="flex flex-column h-12rem">
-                                    <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">Content II</div>
-                                </div>
-                                <div class="flex pt-4 justify-content-between">
-                                    <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="prevCallback" />
-                                    <Button label="Next" icon="pi pi-arrow-right" iconPos="right" @click="nextCallback" />
-                                </div>
-                            </template>
-                        </StepperPanel>
-                        <StepperPanel header="Final" style="height: 400px;">
+                        <StepperPanel header="Finalising Setup" style="height: 400px;">
                             <template #content="{ prevCallback }">
                                 <div class="flex flex-column h-12rem">
-                                    <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">Content III</div>
+                                    <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
+                                        <div v-if="librarySetupDone == false" class="card">
+                                            <p style=" font-size: 23px; color: var(--surface-600);margin-top: 20px;">Setting up library...</p>
+                                            <i class="pi pi-spinner pi-spin" style="margin-bottom: 40px; font-size: 45px; color: var(--green-600)"></i>
+                                        </div>
+                                        <div v-if="librarySetupDone == true" class="card">
+                                            <p style=" font-size: 23px; color: var(--surface-600);margin-top: 20px;">Library setup done!</p>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="flex pt-4 justify-content-start">
-                                    <Button label="Back" severity="secondary" icon="pi pi-arrow-left" @click="prevCallback" />
+                                    <Button label="Finish" severity="success" icon="pi pi-check" @click="setupDone" />
                                 </div>
                             </template>
                         </StepperPanel>
@@ -153,11 +183,17 @@ import TabView from 'primevue/tabview';
 import TabPanel from 'primevue/tabpanel';
 import ListBox from "primevue/listbox";
 import ButtonGroup from 'primevue/buttongroup';
-
+import Dropdown from 'primevue/dropdown';
+import axios from 'axios';
+import FloatLabel from 'primevue/floatlabel';
+import InputText from 'primevue/inputtext';
+import {useSessionStore} from '../stores/session';
 
 export default defineComponent({
 	name: 'LibraryManager',
     components: {
+        InputText,
+        FloatLabel,
         Card,
         Toast,
         FileUpload,
@@ -173,18 +209,31 @@ export default defineComponent({
         TabPanel,
         ListBox,
         ButtonGroup,
+        Dropdown
     },
     data() {
-        return { 
+        return {
+            libraryNameValue: "",
+            tabViewActiveIndex: 0,
+            librarySetupDone: false,
+            isNextButtonDisabled: true,
+            stepperActiveIndex: 0,
             files: [],
             totalSize: 0,
             totalSizePercent: 0,
             libraries: null,
             selectedLibrary: "",
-            products: null
+            products: null,
+            platforms: [
+                {'name': 'iOS', 'icon': 'pi pi-apple'},
+                {'name': 'Android', 'icon': 'pi pi-android'},
+            ],
+            selectedPlatform: "",
+            selectedFileName: ""
         }
     },
     created() {
+        this.sess = useSessionStore()
         const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.ws = new WebSocket(url);
 
@@ -223,9 +272,76 @@ export default defineComponent({
         this.ws.onclose = () => {
             this.isConnected = false;
             console.log('WebSocket connection closed');
+            this.sess.$patch({app: {isConnected: false}})
         };
     },
     methods: {
+        onStepperIndexChanged(event) {
+            console.log("Stepper event", event);
+            
+        },
+        onTabViewChange(event) {
+            this.tabViewActiveIndex = event
+        },
+        setupDone() {
+            this.selectedPlatform = ""
+            this.selectedFileName = ""
+            this.libraryNameValue = ""
+            this.stepperActiveIndex = 0
+            this.tabViewActiveIndex = 0
+        },
+        changeSelectedPlatform(event) {
+            // console.log("-->" + this.selectedPlatform + "<--");
+            
+            // console.log("Detect:", this.selectedPlatform != "", this.libraryNameValue.trim() != "", this.selectedPlatform != "" && this.libraryNameValue.trim() != "");            
+            this.isNextButtonDisabled = (this.selectedPlatform == "") || (this.libraryNameValue.trim() == "");
+        },
+        onStepperChanged(event) {
+            // console.log("Stepper", this.stepperActiveIndex);
+            this.stepperActiveIndex = event.index;
+            // this.stepperActiveIndex = 2
+            // console.log("Stepper", this.stepperActiveIndex);
+            
+            this.isNextButtonDisabled = true;
+            const tmpIndex = event.index;
+            if(tmpIndex === 1) {
+                if(!this.selectedPlatform || this.selectedPlatform == "") {
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: "No platform selected!", life: 3000 });
+                }
+                if(!this.libraryNameValue || this.libraryNameValue == "") {
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: "No library name entered!", life: 3000 });
+                }
+            } else if(tmpIndex === 2) {
+                if(!this.selectedFileName || this.selectedFileName == "") {
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: "No ZIP file uploaded!", life: 3000 });
+                } else {
+                    this.setupLibrary();
+                }
+            } else if(tmpIndex === 3) {
+                if(!this.selectedFileName || this.selectedFileName == "" || !this.selectedPlatform || this.selectedPlatform == "") {
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: "Some steps were skipped!", life: 3000 });
+                }
+            }
+        },
+        async setupLibrary() {
+            try {
+                const formData = new FormData();
+                formData.append('filename', this.selectedFileName);
+                formData.append('platform', this.selectedPlatform.name);
+                formData.append("library", this.libraryNameValue);
+                const response = await axios.post('http://192.168.29.203:8000/api/setup_library', formData, {
+                    headers: {
+                        'Content-Type': 'multipart/form-data'
+                    }
+                });
+                if(response.data.status) {
+                    this.librarySetupDone = true
+                }
+                
+            } catch (error) {
+                console.error('Error uploading file:', error);
+            }
+        },
         onRemoveTemplatingFile(file, removeFileCallback, index) {
             removeFileCallback(index);
             this.totalSize -= parseInt(this.formatSize(file.size));
@@ -243,11 +359,20 @@ export default defineComponent({
             });
         },
         uploadEvent(callback) {
-            this.totalSizePercent = this.totalSize / 10;
+            this.totalSizePercent = this.totalSize / 10;            
             callback();
         },
-        onTemplatedUpload() {
-            this.$toast.add({ severity: 'info', summary: 'Success', detail: 'File Uploaded', life: 3000 });
+        onTemplatedUpload(event) {
+            const response = JSON.parse(event.xhr.response);
+            // console.log(response);
+            
+            if(response.status) {
+                this.$toast.add({ severity: 'info', summary: 'Success', detail: 'File Uploaded', life: 3000 });
+                this.selectedFileName = response.filename;
+                this.isNextButtonDisabled = false;
+            } else {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: response.message, life: 3000 });
+            }
         },
         formatSize(bytes) {
             const k = 1024;

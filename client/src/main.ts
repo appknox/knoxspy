@@ -8,9 +8,12 @@ import 'primeicons/primeicons.css'
 import Shortkey from "vue3-shortkey"
 import ToastService from 'primevue/toastservice';
 import { createPinia } from 'pinia';
+import ConfirmationService from 'primevue/confirmationservice';
+import Tooltip from 'primevue/tooltip';
 
 const pinia = createPinia()
 
 
-
-createApp(App).use(pinia).use(PrimeVue).use(ToastService).use(Shortkey).use(router).mount('#app')
+const app = createApp(App)
+app.directive('tooltip', Tooltip)
+app.use(pinia).use(PrimeVue).use(ToastService).use(Shortkey).use(router).use(ConfirmationService).mount('#app')
