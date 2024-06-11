@@ -91,6 +91,9 @@ router.post("/api/setup_library", upload.none(), async (req: any, res: any) => {
         });
         if(tmpAgentFiles.indexOf("package.json") > -1) {
             const tmpAgentResult = await compileFridaAgent(unzipPath + entries[0])
+            readdirSync(".").forEach(file => {
+                console.log(file);                
+            })
             copyFileSync(unzipPath + entries[0] + "/_agent.js", "libraries/" + entries[0] + ".js")
         }
         tmpJSONResponse = {'status': true, 'message': "Library added successfully! Location: 'libraries/" + entries[0] + ".js'"}

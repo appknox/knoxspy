@@ -331,7 +331,7 @@ export default defineComponent({
                 this.showSticky(message['message'][0], 'Error', 'error')
                 console.log("got an error from script");
             } else if (message['action'] == 'successOutput') {
-                this.showSticky(message['message'], 'Success', 'success')
+                // this.showSticky(message['message'], 'Success', 'success')
                 console.log("got an output from server");
             }else if(message['action'] == 'scriptOutput') {
                 const libraryStatus = message['message'];

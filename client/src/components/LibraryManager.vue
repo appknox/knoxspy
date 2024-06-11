@@ -12,7 +12,7 @@
                 <p class="m-0"> 
           
                     <div class="card flex justify-content-center" style="width: 700px; margin: 0 auto">
-                        <Listbox v-model="selectedLibrary" :options="libraries" optionLabel="name" class="w-full md:w-14rem" listStyle="max-height:250px" :focusOnHover="false">
+                        <Listbox v-model="selectedLibrary" :options="libraries" optionLabel="name" class="w-full md:w-14rem" listStyle="minx-height:250px" :focusOnHover="false">
                             <template #option="slotProps">
                                 <div class="flex align-items-start flex-column" style="display: flex; gap: 10px; align-items: center">
                                     <div>
@@ -83,7 +83,7 @@
                                     <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
                                         <div class="card">
                                             <Toast />
-                                            <FileUpload name="demo[]" url="http://192.168.29.203:8000/api/upload" @upload="onTemplatedUpload($event)" :multiple="true" accept="application/zip" :maxFileSize="100000000" @select="onSelectedFiles" style="width: 100%;">
+                                            <FileUpload name="demo[]" :url="fileUploadURL" @upload="onTemplatedUpload($event)" :multiple="true" accept="application/zip" :maxFileSize="100000000" @select="onSelectedFiles" style="width: 100%;">
                                                 <template #header="{ chooseCallback, uploadCallback, clearCallback, files }">
                                                     <div class="flex flex-wrap justify-content-between align-items-center flex-1 gap-2" style="display: flex; justify-content: space-between;width: 100%;align-items: center">
                                                         <div class="flex gap-2">
@@ -229,11 +229,16 @@ export default defineComponent({
                 {'name': 'Android', 'icon': 'pi pi-android'},
             ],
             selectedPlatform: "",
-            selectedFileName: ""
+            selectedFileName: "",
+            ws: null,
+            host: "",
+            fileUploadURL: ""
         }
     },
     created() {
         this.sess = useSessionStore()
+        this.host = import.meta.env.VITE_SERVER_IP
+        this.fileUploadURL = "http://" + import.meta.env.VITE_SERVER_IP + ":8000/api/upload"
         const url = 'ws://' + import.meta.env.VITE_SERVER_IP + ':8000';
         this.ws = new WebSocket(url);
 
@@ -251,6 +256,8 @@ export default defineComponent({
             this.libraries = [];
             if(message['action'] === 'library') {
                 const tmpJsonData = JSON.parse(message['message'])
+                console.log(tmpJsonData);
+                
                 for(const a in tmpJsonData) {
                     console.log(tmpJsonData[a]);
                     
@@ -289,6 +296,10 @@ export default defineComponent({
             this.libraryNameValue = ""
             this.stepperActiveIndex = 0
             this.tabViewActiveIndex = 0
+
+
+            const json = {"action":"library"}
+            this.ws.send(JSON.stringify(json))
         },
         changeSelectedPlatform(event) {
             // console.log("-->" + this.selectedPlatform + "<--");
@@ -329,7 +340,7 @@ export default defineComponent({
                 formData.append('filename', this.selectedFileName);
                 formData.append('platform', this.selectedPlatform.name);
                 formData.append("library", this.libraryNameValue);
-                const response = await axios.post('http://192.168.29.203:8000/api/setup_library', formData, {
+                const response = await axios.post('http://'+this.host+':8000/api/setup_library', formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data'
                     }
