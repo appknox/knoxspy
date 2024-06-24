@@ -7,13 +7,23 @@ import { execSync } from 'child_process';
 import DBManager from './components/database';
 import { createServer } from 'http';
 
+
 const app = express();
 const router = Router();
 const dbManager = new DBManager("./data.db");
+const cors = require('cors');
 
 const upload = multer({
     dest: 'uploads/'
 });
+
+// const corsOptions = {
+//     origin: '*', // Specify the allowed origin
+//     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Specify allowed methods
+//     optionsSuccessStatus: 204 // Some legacy browsers choke on 204
+//   };
+  
+app.use(cors());
 
 async function checkZipEntries(zipFilePath: string) {
     try {

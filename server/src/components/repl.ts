@@ -101,7 +101,7 @@ class REPLManager {
                     var tmpJson = JSON.parse(payload);
                     tmpJson['id'] = ID;
                     console.log("Attach script updated payload: ", tmpJson);
-                    this.ws.broadcastData(JSON.stringify({'action':'replayUpdate', 'replay':JSON.stringify(tmpJson)}))
+                    this.ws.broadcastData(JSON.stringify({'action':'replayUpdate', 'replay': JSON.stringify(tmpJson)}))
 
                     dbManager.updateReplayedRepeater(tmpJson, (updated: any) => {
                         console.log("updated replayed request");

@@ -258,6 +258,7 @@ class DBManager {
                 
                 const tmpJsonData = {
                     id: rows.id,
+                    protocol: rows.protocol,
                     method: rows.method,
                     host: rows.host,
                     endpoint: rows.endpoint,

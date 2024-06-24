@@ -6,12 +6,18 @@ Java.perform(function() {
         var payload = message.payload.data;
         var body = payload.request_body;
         var url = payload.endpoint;
+        var headers = payload.request_headers;
         if (payload.method == 'POST') {
             var request = makePostRequest(url,body)
         } else {
             var request = RequestBuilder.$new()
             .url(url)
             .build();
+        }
+        if (headers) {
+            for (var key in headers) {
+                request.addHeader(key, headers[key]);
+            }
         }
         var response = client.newCall(request).execute();
         var responseHeaders = response.headers();

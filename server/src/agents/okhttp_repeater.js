@@ -1,19 +1,41 @@
 Java.perform(function() {
     recv('data', function(message) {
-        console.log(message);
         var OkHttpClient = Java.use('okhttp3.OkHttpClient');
         var RequestBuilder = Java.use('okhttp3.Request$Builder');
         var client = OkHttpClient.$new();
         var payload = message.payload;
         var body = payload.request_body;
-        var url = "http://" + payload.host + payload.endpoint;
+        var url = payload.protocol + "://" + payload.host + payload.endpoint;
+        var headersArray = JSON.parse(payload.request_headers);
         if (payload.method == 'POST') {
-            var request = makePostRequest(url,body)
-        } else {
-            var request = RequestBuilder.$new()
-            .url(url)
-            .build();
+            var contentType = headersArray.find(header => header.toLowerCase().startsWith("content-type:"));
+            if (contentType) {
+                contentType = contentType.split(": ")[1];
+                var builder = makePostRequest(url,body,contentType)
+            } else {
+                var builder = makePostRequest(url,body)
+            }
+        } 
+        else if (payload.method == 'PUT') {
+            var builder = makePutRequest(url,body)
         }
+        else if (payload.method == 'DELETE') {
+            var builder = makeDeleteRequest(url)
+        }
+        else if (payload.method == 'PATCH') {
+            var builder = makePatchRequest(url,body)
+        }
+        else {
+            var builder = RequestBuilder.$new()
+            .url(url)   
+        }
+        headersArray.forEach(function(header) {
+            var splitHeader = header.split(": ");
+            var headerName = splitHeader[0];
+            var headerValue = splitHeader[1];
+            builder.header(headerName, headerValue);
+        });
+        var request = builder.build();
         var response = client.newCall(request).execute();
         var responseHeaders = response.headers();
         var responseHeaderNames = responseHeaders.names();
@@ -42,6 +64,7 @@ Java.perform(function() {
         }
         const tmpPayload = {
                 "method": payload.method,
+                "protocol": payload.protocol,
                 "host":payload.host,
                 "endpoint": payload.endpoint,
                 "request_headers": JSON.parse(payload.request_headers),
@@ -54,7 +77,26 @@ Java.perform(function() {
         send(JSON.stringify(tmpPayload));
         })
 
-function makePostRequest(url, request_body){
+});
+
+function makePostRequest(url, request_body, content_type){
+    var MediaType = Java.use('okhttp3.MediaType');
+    var RequestBuilder = Java.use('okhttp3.Request$Builder');
+    if (content_type) {
+        var media_type = MediaType.parse(content_type);
+    } else {
+        var media_type = MediaType.parse('application/json; charset=utf-8');
+    }
+    
+    var RequestBody = Java.use('okhttp3.RequestBody');
+    var body = RequestBody.create(media_type, request_body);
+    var request = RequestBuilder.$new()
+        .url(url)
+        .post(body)
+    return request;
+}
+
+function makePutRequest(url, request_body){
     var MediaType = Java.use('okhttp3.MediaType');
     var RequestBuilder = Java.use('okhttp3.Request$Builder');
     var JSON = MediaType.parse('application/json; charset=utf-8');
@@ -62,8 +104,26 @@ function makePostRequest(url, request_body){
     var body = RequestBody.create(JSON, request_body);
     var request = RequestBuilder.$new()
         .url(url)
-        .post(body)
-        .build();
+        .put(body)
     return request;
 }
-});
+
+function makePatchRequest(url, request_body){
+    var MediaType = Java.use('okhttp3.MediaType');
+    var RequestBuilder = Java.use('okhttp3.Request$Builder');
+    var JSON = MediaType.parse('application/json; charset=utf-8');
+    var RequestBody = Java.use('okhttp3.RequestBody');
+    var body = RequestBody.create(JSON, request_body);
+    var request = RequestBuilder.$new()
+        .url(url)
+        .patch(body)
+    return request;
+}
+
+function makeDeleteRequest(url){
+    var RequestBuilder = Java.use('okhttp3.Request$Builder');
+    var request = RequestBuilder.$new()
+        .url(url)
+        .delete()
+    return request;
+}

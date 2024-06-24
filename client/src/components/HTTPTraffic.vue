@@ -307,7 +307,7 @@ export default defineComponent({
 
                 JSON.parse(element.response_headers).forEach((ele) => {
                     if(ele.toLowerCase().startsWith("content-type")) {
-                        if(ele.indexOf("application/json")) {
+                        if(ele.indexOf("application/json") > 0) {
                             tmpJSONFlag = true;
                         }
                     }
@@ -360,7 +360,7 @@ export default defineComponent({
 
                         JSON.parse(element.response_headers).forEach((ele) => {
                             if(ele.toLowerCase().startsWith("content-type")) {
-                                if(ele.indexOf("application/json")) {
+                                if(ele.indexOf("application/json") > 0) {
                                     tmpJSONFlag = true;
                                 }
                             }
@@ -413,15 +413,19 @@ export default defineComponent({
                 
                 var tmpRequestContent = tmpData
                 tmpData = element.response_headers.join("\n")
-                
+                var newJSONFlag = false;
                 element.response_headers.forEach((ele) => {
+                    console.log("For element:", ele);
                     if(ele.toLowerCase().startsWith("content-type")) {
-                        if(ele.indexOf("application/json")) {
-                            tmpJSONFlag = true;
+                        console.log("Content-Type:", ele);
+                        if(ele.indexOf("application/json") > 0) {
+                            console.log("Element in final loop:", ele)
+                            newJSONFlag = true;
                         }
                     }
                 })
-                if(tmpJSONFlag) {
+                console.log("New flag value: ", newJSONFlag)
+                if(newJSONFlag) {
                     tmpData += "\n\n" + JSON.stringify(JSON.parse(element.response_body), null, 2);
                 } else {
                     tmpData += "\n\n" + element.response_body
@@ -561,6 +565,7 @@ export default defineComponent({
                 // console.log(tmpRepeaterPayload);
                 
                 tmpRepeaterPayload['id'] = tmpRepeaterData.id;
+                tmpRepeaterPayload['protocol'] = tmpRepeaterData.protocol;
                 tmpRepeaterPayload['host'] = tmpRepeaterData.host;
                 tmpRepeaterPayload['status_code'] = tmpRepeaterData.status_code
                 tmpRepeaterPayload['response_body'] = tmpRepeaterData.response_body

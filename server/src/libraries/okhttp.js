@@ -3,10 +3,12 @@ Java.perform(function() {
     var Buffer = Java.use('okio.Buffer');
     OkHttpClient.newCall.overload('okhttp3.Request').implementation = function(request) {
         var requestUrl = request.url().toString();
+        var protocol = request.url().scheme();
         var requestBody = request.body();
         var method = request.method().toString();
         const requestList = requestUrl.split("/");
         const requestHost = requestList[2];
+        const URL = requestUrl.split(requestHost)[1];
         var contentLength = requestBody ? requestBody.contentLength() : 0;
         var buffer = Buffer.$new();
         var requestBodyString = '';
@@ -33,6 +35,7 @@ Java.perform(function() {
             var finalValue = `${headerName}: ${headerValue}`;
             headersArr.push(finalValue);
         }
+        headersArr = headersArr.filter((item, index) => headersArr.indexOf(item) === index);
         // Response data here
         var response = this.newCall(request).execute();
         var responseHeaders = response.headers();
@@ -64,10 +67,11 @@ Java.perform(function() {
         }
         const tmpPayload = {
             'method': method,
+            'protocol': protocol,
             'host':requestHost,
-            'endpoint': requestUrl,
+            'endpoint': URL,
             'request_headers': JSON.stringify(headersArr),
-            'request_body': JSON.stringify(requestBodyString),
+            'request_body': requestBodyString,
             'status_code': 200,
             'response_headers': JSON.stringify(respHeaders),
             'response_body': responseBodyString

@@ -27,7 +27,6 @@
         "node": "^20.13.0",
         "nodejs": "^0.0.0",
         "sqlite3": "^5.1.7",
-        "tsc": "^2.0.4",
         "unzipper": "^0.11.6",
         "vite": "^5.2.11",
         "vite-plugin-vuetify": "^2.0.3",
