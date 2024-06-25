@@ -17,6 +17,17 @@ export const useSessionStore = defineStore('session', {
             name: '',
             id: -1
         },
+        startupAppConfig: {
+            isConnected: false,
+            name: '',
+            identifier: '',
+            platform: '',
+            library: null,
+            deviceId: null,
+            status: '',
+            sessionId: -1,
+            restart: false
+        },
         error: null
     }),
     getters: {

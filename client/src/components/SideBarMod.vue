@@ -11,6 +11,7 @@
             <li><router-link to="/apps"><i class="pi pi-th-large" style="margin-right: 10px"></i><span :class="{'active': isActive}">Apps</span></router-link></li>
             <li><router-link to="/traffic"><i class="pi pi-history mr-2" style="margin-right: 10px"></i><span :class="{'active': isActive}">HTTP Traffic</span></router-link></li>
             <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isActive}">Library Manager</span></router-link></li>
+            <li><router-link to="/settings"><i class="pi pi-cog mr-2" style="margin-right: 10px"></i><span :class="{'active': isActive}">Settings</span></router-link></li>
         </ul>
         <div class="app-info" :class="isActive ? '' : 'closed'">
             <!-- <p class="app-message" type="connected">{{status}}<span>{{ name }}</span></p> -->
@@ -150,7 +151,7 @@ export default defineComponent({
         
 
         this.sess.$subscribe((mutation, state) => {
-            console.log(mutation, state);
+            // console.log(mutation, state);
             
             if(mutation.type === 'patch object') {
                 
@@ -166,8 +167,8 @@ export default defineComponent({
                     }
                     
                     
-                    console.log("Mutation", mutation.payload);
-                    console.log(appConnectionObj);
+                    // console.log("Mutation", mutation.payload);
+                    // console.log(appConnectionObj);
 
                     if('isConnected' in mutation.payload.app) {
                         if(mutation.payload.app.isConnected == false) {
@@ -184,14 +185,14 @@ export default defineComponent({
                 }
                 if('session' in mutation.payload) {
                     const sessionConnectionObj = mutation.payload.session;
-                    console.log(sessionConnectionObj);
+                    // console.log(sessionConnectionObj);
                     
                     this.sessionName = sessionConnectionObj.name
                 }
             }
         });
 
-        window.addEventListener('beforeunload', this.handleReload)
+        // window.addEventListener('beforeunload', this.handleReload)
     }
 });
 </script>

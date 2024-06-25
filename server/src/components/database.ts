@@ -166,12 +166,21 @@ class DBManager {
     }
 
     newSession(data: Object, callback: (lastId: number) => void) {
-        const columns = Object.keys(data);
-        const values = Object.values(data);
-        const placeholders = columns.map(() => '?').join(',');
+        var columns = Object.keys(data);
+        var values = Object.values(data);
+        const session_config = {
+            "session": "No",
+            "device": "No",
+            "app": "No",
+            "library": "No"
+        }
+        var placeholders = columns.map(() => '?').join(',');
+        columns.push("config")
+        values.push(JSON.stringify(session_config))
+        placeholders += ",?";
         const sql = `INSERT INTO sessions (${columns.join(', ')}) VALUES (${placeholders})`;
-
-        // Execute prepared statement
+        console.log("Inserting:", sql);
+        
         this.db.run(sql, values, function(err: any) {
             if (err) {
                 console.error(`Error inserting data into sessions: ${err.message}`);
@@ -192,7 +201,6 @@ class DBManager {
         const sql = `INSERT INTO current_session (session_id) VALUES (?)`;
         //console.log(sql);
         
-
         // Execute prepared statement
         this.db.run(sql, session_id, function(err: any) {
             if (err) {
@@ -221,9 +229,22 @@ class DBManager {
         });
     }
 
+
+    deleteSession(session_id: number, callback: (status: boolean) => void) {
+        const sql = `DELETE FROM sessions WHERE id=?`;
+        this.db.run(sql, session_id, function(err: any) {
+            if (err) {
+                console.error(`Error deleting data from current_session: ${err.message}`);
+                callback(false)
+            } else {
+                callback(true)
+            }
+        });
+    }
+
     getActiveSession(callback: (rows: string) => void) {
         
-        const sql = `select current_session.session_id as id,sessions.name from current_session inner join sessions on current_session.session_id=sessions.id order by current_session.id desc limit 1;`;
+        const sql = `select current_session.session_id as id,sessions.name, sessions.config as config from current_session inner join sessions on current_session.session_id=sessions.id order by current_session.id desc limit 1;`;
         //console.log(sql);
         
 
@@ -231,7 +252,7 @@ class DBManager {
         this.db.all(sql, function(err: any, row: any) {
             if (err) {
                 console.error(`Error getting data from current_session: ${err.message}`);
-                callback(JSON.stringify({'name': null, 'id': -1}))
+                callback(JSON.stringify({'name': null, 'id': -1, 'config': {}}))
             } else {
                 // //console.log(`Rows fetched from current_session`);
                 if(row.length) {
@@ -239,12 +260,35 @@ class DBManager {
                     // //console.log(row[0]);
                     callback(JSON.stringify(row[0]))
                 } else {
-                    callback(JSON.stringify({'name': null, 'id': -1}))
+                    callback(JSON.stringify({'name': null, 'id': -1, 'config': {}}))
                 }
                 // this.getDataFromDatabase((data) => {
                 //     // broadcastData(data)
                 // })
             }
+        });
+    }
+
+
+    updateActiveSession(config: string, callback: (status: boolean, message: string) => void) {
+        console.log("Updated config", config)
+        this.getActiveSession((rows: string) => {
+            const tmpSession = JSON.parse(rows);
+            console.log(tmpSession);
+            
+            if(tmpSession.id !== -1) {
+                const sql = `update sessions set config=? where id=?`;
+                this.db.all(sql, [config, tmpSession.id], function(err: any, row: any) {
+                    if (err) {
+                        console.error(`Error inserting data into sessions: ${err.message}`);
+                        callback(false, `Error inserting data into sessions: ${err.message}`);
+                    } else {
+                        callback(true, "Updated successfully!");
+                    }
+                });
+            } else {
+                callback(false, "No active session!");
+            }            
         });
     }
 

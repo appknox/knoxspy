@@ -354,6 +354,25 @@ class WebSocketClient {
                             this.manager.broadcastData(JSON.stringify({'action': 'deleteRepeaterTabUpdate', 'message': status, 'id': jsonData['id']}))                            
                         });                      
                         break;
+                    case 'deleteSession':
+                        const tmpSession3 = jsonData['session'].id;
+                        // this.manager.broadcastData(JSON.stringify({'action': 'deleteSession', 'message': true, 'session': tmpSession3}))
+                        dbManager.deleteSession(tmpSession3, (status: boolean) => {
+                            this.manager.broadcastData(JSON.stringify({'action': 'deleteSession', 'message': status, 'session': tmpSession3}))
+                        });
+                        break;
+                    case 'lastSessionConfig':
+                        const tmpSession4 = jsonData['session'];
+                        console.log("Last Session Config:", tmpSession4);
+                        dbManager.updateActiveSession(JSON.stringify(tmpSession4), (status: boolean, message: string) => {
+                            console.log("Session updated:", status, message);
+                            this.manager.broadcastData(JSON.stringify({'action': 'lastSessionConfigUpdate', 'message': message, 'status': status}))
+                        })
+                        // this.manager.broadcastData(JSON.stringify({'action': 'deleteSession', 'message': true, 'session': tmpSession3}))
+                        // dbManager.deleteSession(tmpSession3, (status: boolean) => {
+                        //     this.manager.broadcastData(JSON.stringify({'action': 'deleteSession', 'message': status, 'session': tmpSession3}))
+                        // });
+                        break;
                     default:
                         this.send(JSON.stringify({"action":"jsonError", "message": ["Invalid action"]}))
                         break;

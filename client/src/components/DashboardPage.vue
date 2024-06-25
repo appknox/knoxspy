@@ -22,7 +22,7 @@
                         </p>
                         <div style="gap: 10px; display: flex; flex-direction: column;">
                             <InputText v-model="newSessionName" placeholder="Session Name" />
-                            <Button label="Create New" @click="createNewSession"/>
+                            <Button label="Create New" size="small" @click="createNewSession"/>
                         </div>
                     </div>
                     <div style="flex-grow: 1; flex-basis: 0; padding: 20px;border-left: 1px solid #eee;">
@@ -30,7 +30,10 @@
                             Choose An Existing One
                         </p>
                         <Listbox v-model="selectedSession" :options="sessionList" optionLabel="name" class="w-full md:w-14rem" style="" />
-                        <Button label="Choose" style="margin-top: 10px;" @click="chooseExistingSession"/>
+                        <div style="display: flex; gap: 10px; justify-content: center">
+                            <Button icon="pi pi-times" size="small" severity="danger" label="Delete" style="margin-top: 10px;" @click="deleteSession"/>
+                            <Button icon="pi pi-check" size="small" label="Choose" style="margin-top: 10px;" @click="chooseExistingSession"/>
+                        </div>
                     </div>
                 </div>
             </template>
@@ -101,18 +104,71 @@ export default defineComponent({
                     this.sessionList.push(item)
                 })                
             } else if (message['action'] === 'activeSession') {
-                // console.log(message['session']);
+                const tmpActiveSession = message['session'];
+                var tmpLastSessionConfig = {"session": {}, "app": {}};
                 this.sess.$patch({'session': message['session']})
+
+                if(tmpActiveSession.name) {
+                    console.log("Found an active session! Trying to restore last session");
+                    console.log(message['session'], 'config' in message['session']);
+                    
+                    if('session' in message && 'config' in message['session']) {
+                        console.log("Valid config found!");
+                        const tmpSessionConfig = JSON.parse(message['session']['config']);
+                        console.log(tmpSessionConfig);
+                        console.log(tmpSessionConfig['sessionStoreSession']);
+                        
+                        if('sessionStoreSession' in tmpSessionConfig) {
+                            tmpLastSessionConfig["session"] = tmpSessionConfig['sessionStoreSession'];
+                        } else {
+                            tmpLastSessionConfig["session"] = {}
+                        }
+
+                        if('sessionStoreApp' in tmpSessionConfig) {
+                            tmpLastSessionConfig["app"] = tmpSessionConfig['sessionStoreApp'];
+                        } else {
+                            tmpLastSessionConfig["app"] = {}
+                        }
+                    }
+                    
+                    console.log("Last Config:", tmpLastSessionConfig);
+                    // this.sess.$patch({'startupAppConfig': JSON.parse(message['session']['config'])['sessionStoreSession']})
+                    // console.log(tmpLastSessionConfig.name, tmpLastSessionConfig.id);
+                    // if(this.sess.session.name !== tmpLastSessionConfig.name) {
+                    //     console.log("Last session used was different: ", tmpLastSessionConfig);
+                        
+                    // }
+                    // console.log(message['session']);
+                    
+                    // console.log(this.sess.startupAppConfig);
+                }
+                
                 if(message['session'].name != null) {
                     // console.log(this.sess.session);
                     this.isSessionActive = true
                     this.newSessionName = ""
                     this.selectedSession = ""
                 }
-                // this.$router.push({path: '/libraries'})
+                // this.$router.push({path: '/settings'})
                 
             } else if( message['action'] === "clearActiveSession") {
                 this.isSessionActive = message['status']
+            } else if( message['action'] === "deleteSession") {
+                if(message['message']) {
+                    console.log(this.sessionList);
+                    
+                    const newSessionList = this.sessionList.filter((item) => item.id != message['session']);
+                    console.log("Index:", newSessionList);
+                    this.sessionList = newSessionList;
+                    if(this.selectedSession && this.selectedSession.id == message['session']) {
+                        console.log("Resetting selected session");
+                        
+                        this.selectedSession = null;
+                    }
+                    // this.sessionList.splice(this.sessionList.indexOf(sessionIndex), 1);
+                } else {
+
+                }
             }
         };
 
@@ -127,6 +183,14 @@ export default defineComponent({
         };
     },
     methods: {
+        deleteSession() {
+            if(!this.selectedSession || this.selectedSession == "") {
+                alert("No session selected!")
+            } else {
+                console.log(this.selectedSession)
+                this.ws.send(JSON.stringify({'action': 'deleteSession', 'session': this.selectedSession}))
+            }
+        },
         clearActiveSession() {
             this.ws.send(JSON.stringify({'action': 'clearActiveSession'}))
         },
