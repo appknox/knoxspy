@@ -17,7 +17,7 @@
         "@types/koa-multer": "^1.0.4",
         "cors": "^2.8.5",
         "express": "^4.19.2",
-        "frida": "^16.2.1",
+        "frida": "^16.5.9",
         "https": "^1.0.0",
         "koa": "^2.15.3",
         "koa-bodyparser": "^4.4.1",
@@ -43,7 +43,7 @@
         "@types/node": "^20.12.11",
         "@types/unzipper": "^0.10.9",
         "@types/ws": "^8.5.10",
-        "nodemon": "^3.1.1",
+        "nodemon": "^3.1.9",
         "ts-node": "^10.9.2",
         "typescript": "^5.4.5",
         "ws": "^8.17.0"
