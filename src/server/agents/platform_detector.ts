@@ -1,1 +1,0 @@
-send(Java.available ? "Android" : "iOS")

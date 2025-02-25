@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-require('./src/scripts/init.js');
+require("./app/scripts/init.js");

@@ -1,0 +1,41 @@
+{
+  "name": "client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@revolist/vue-datagrid": "^4.7.0-next.2",
+    "@revolist/vue3-datagrid": "^4.0.0-next.1",
+    "@wdns/vue-code-block": "^2.3.2",
+    "axios": "^1.7.2",
+    "codemirror": "^6.0.1",
+    "highlight.js": "^11.9.0",
+    "http-message-parser": "^0.0.34",
+    "http-parser-js": "^0.5.8",
+    "pinia": "^2.1.7",
+    "primeicons": "^7.0.0",
+    "primevue": "^3.52.0",
+    "prismjs": "^1.29.0",
+    "vue": "^3.4.21",
+    "vue-code-highlight": "^0.7.8",
+    "vue-codemirror": "^6.1.1",
+    "vue-router": "^4.3.2",
+    "vue3-shortkey": "^4.0.0",
+    "yarn": "^1.22.22"
+  },
+  "devDependencies": {
+    "@codemirror/language": "^6.10.1",
+    "@codemirror/legacy-modes": "^6.4.0",
+    "@types/node": "^20.12.12",
+    "@types/prismjs": "^1.26.4",
+    "@vitejs/plugin-vue": "^5.0.4",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0",
+    "vue-tsc": "^2.0.6"
+  }
+}
