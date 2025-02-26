@@ -25,6 +25,8 @@ enum WebSocketAction {
   SCRIPT_ERROR = "scriptError",
   SCRIPT_OUTPUT = "scriptOutput",
   SUCCESS_OUTPUT = "successOutput",
+  DETECT_PLATFORM = "detectDevicePlatform",
+  DETECT_LIBRARIES = "detectLibraries",
 }
 
 /**
@@ -177,10 +179,10 @@ class WebSocketClient {
       return this.sendJsonError(["Action is missing"]);
     }
     console.log("Action:", data.action);
-    try {
-      // Get all available devices
-      const devices = await fridaManager.getAllDevices();
 
+    let devices: DeviceDetails[] = await fridaManager.getAllDevices();
+
+    try {
       switch (data.action) {
         case "sessions":
           const sessions = await dbManager.getSessions();
@@ -250,6 +252,8 @@ class WebSocketClient {
           break;
 
         case WebSocketAction.DEVICES:
+          // Get all available devices
+          devices = await fridaManager.getAllDevices();
           this.handleGetDevices(devices);
           break;
         case WebSocketAction.PROCESSES:
@@ -266,6 +270,117 @@ class WebSocketClient {
           break;
         case WebSocketAction.REPLAY_REQUEST:
           await this.handleReplayRequest(data);
+          break;
+        case WebSocketAction.DETECT_LIBRARIES:
+          await this.handleDetectLibraries(data);
+          break;
+        case "changeLibrary":
+          //console.log("Changing libraries");
+          const tmpSessionId = data["sessionId"];
+          const tmpLibrary = data["library"]["file"];
+          //console.log(this.sessions);
+          const tmpSession1 = this.sessions.map((item) => {
+            if (item.id == tmpSessionId) {
+              return item;
+            }
+          });
+          if (tmpSession1.length > 0) {
+            if (tmpSession1[0]) {
+              //console.log(tmpSession1[0]);
+              const repl = new REPLManager(
+                tmpSession1[0]["session"],
+                tmpSessionId,
+                this.manager
+              );
+              repl.run_script(tmpLibrary);
+              //console.log("changedLibrary already");
+            }
+          }
+          break;
+        case "sendToRepeater":
+          const rowId = data["id"];
+          //console.log("Row ID:" + tmpRepeaterPayload);
+          dbManager.sendToRepeater(rowId).then((lastObj) => {
+            //console.log("Entry created: " + lastObj.id);
+            this.manager.broadcastData(
+              JSON.stringify({ action: "repeaterAdd", message: lastObj })
+            );
+          });
+          break;
+        case "duplicateRepeater":
+          const rowId1 = data["id"];
+          //console.log("Row ID:" + tmpRepeaterPayload);
+          dbManager.duplicateRepeater(rowId1).then((lastObj) => {
+            //console.log("Entry created: " + lastObj.id);
+            this.manager.broadcastData(
+              JSON.stringify({ action: "repeaterAdd", message: lastObj })
+            );
+          });
+          break;
+        case "repeaterUpdate":
+          dbManager.getRepeaterTraffic();
+          break;
+        case "replayRequest":
+          var replayPayload = data["replay"];
+          const tmpPlatform = data["platform"];
+          var appData = data["appData"];
+          var library = "iOS_makeAPIRequest.js";
+          if (tmpPlatform.toLowerCase() === "android") {
+            library = "okhttp_repeater.js";
+          }
+          //console.log('Replay request: ', replayPayload);
+          const process = await fridaManager.findProcesses(
+            appData.deviceId,
+            appData.appName
+          );
+          const processID = process[0];
+          const session = await fridaManager.attachToApp(
+            appData.deviceId,
+            processID["pid"]
+          );
+          console.log("Replay payload:", replayPayload);
+
+          // this.sessions.push({'id': appData.sessionId, 'session': session})
+          // const channel = new Channels(session, appData.appName, appData.sessionId, appData.appId, library, appData.deviceId, this.manager, processID.pid);
+          // channel.connect()
+          // if(library && library !== null) {
+          const repl = new REPLManager(
+            session,
+            appData.sessionId,
+            this.manager
+          );
+          repl.attach_script(library, replayPayload, this.manager);
+          // }
+          // else {
+          //     this.send(JSON.stringify({"action":"jsonError", "message": ["No library provided"]}))
+          // }
+
+          //this.manager.broadcastData(JSON.stringify({'action': 'replayUpdate', 'replay': replayPayload}))
+          break;
+        case "setRepeaterTabTitle":
+          //console.log("Row ID:" + tmpRepeaterPayload);
+          dbManager
+            .updateRepeaterTitle(data["id"], data["title"])
+            .then((lastObj: any) => {
+              this.manager.broadcastData(
+                JSON.stringify({
+                  action: "repeaterTabTitleUpdate",
+                  message: lastObj,
+                })
+              );
+            });
+          break;
+        case "deleteRepeaterTab":
+          console.log("Repeater Deletion ID:" + data["id"]);
+          dbManager.deleteRepeaterTab(data["id"]).then((status: any) => {
+            this.manager.broadcastData(
+              JSON.stringify({
+                action: "deleteRepeaterTabUpdate",
+                message: status,
+                id: data["id"],
+              })
+            );
+          });
           break;
         default:
           this.sendJsonError(["Unknown action"]);
@@ -397,7 +512,7 @@ class WebSocketClient {
 
     // Attach to the process
     try {
-      const session = await fridaManager.attachApp(deviceId, processId);
+      const session = await fridaManager.attachToApp(deviceId, processId);
 
       // Track the session
       const sessionInfo: SessionInfo = { id: sessionId, session };
@@ -510,6 +625,31 @@ class WebSocketClient {
   }
 
   /**
+   * Handle the 'detectLibraries' action - detect libraries in the app
+   */
+  private async handleDetectLibraries(data: any): Promise<void> {
+    console.log("Detecting libraries");
+    const sessionId = data["sessionId"];
+    console.log(this.sessions);
+    const tmpSession = this.sessions.map((item) => {
+      if (item.id == sessionId) {
+        return item;
+      }
+    });
+    if (tmpSession.length > 0) {
+      if (tmpSession[0]) {
+        //console.log(tmpSession[0]);
+        const repl = new REPLManager(
+          tmpSession[0]["session"],
+          sessionId,
+          this.manager
+        );
+        repl.detect_libraries();
+      }
+    }
+  }
+
+  /**
    * Handle the 'replayRequest' action - replay a previous request
    */
   private async handleReplayRequest(data: any): Promise<void> {
@@ -537,7 +677,10 @@ class WebSocketClient {
       const processId = processes[0].pid;
 
       // Attach to the app
-      const session = await fridaManager.attachApp(appData.deviceId, processId);
+      const session = await fridaManager.attachToApp(
+        appData.deviceId,
+        processId
+      );
 
       console.log("Replay payload:", replayPayload);
 

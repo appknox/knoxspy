@@ -23,7 +23,7 @@ interface OperationOptions {
  * Convert byte array to image URI for app icons
  */
 function bytesToImageURI(byteBuffer: Buffer): string {
-  const base64String = Buffer.from(byteBuffer).toString('base64');
+  const base64String = Buffer.from(byteBuffer).toString("base64");
   return "data:image/png;base64," + base64String;
 }
 
@@ -86,6 +86,7 @@ export class FridaManager {
    * @returns List of devices with platform information
    */
   async getAllDevices(): Promise<DeviceDetails[]> {
+    const supportedPlatforms = ["Android", "iOS"];
     try {
       const devices = await this.deviceManager.enumerateDevices();
       const deviceDetails: DeviceDetails[] = [];
@@ -93,12 +94,14 @@ export class FridaManager {
       // Process each device to get its platform
       for (const device of devices) {
         const platform = await this.getDevicePlatform(device);
-        deviceDetails.push({
-          id: device.id,
-          name: device.name,
-          type: device.type.toString(),
-          platform: platform,
-        });
+        if (supportedPlatforms.includes(platform)) {
+          deviceDetails.push({
+            id: device.id,
+            name: device.name,
+            type: device.type.toString(),
+            platform: platform,
+          });
+        }
       }
 
       return deviceDetails;
@@ -118,7 +121,7 @@ export class FridaManager {
       const params = await device.querySystemParameters();
       return params.os?.name || "Unknown";
     } catch (error) {
-      console.error(`Error getting platform for device ${device.id}:`, error);
+      // console.error(`Error getting platform for device ${device.id}:`, error);
       return "Unknown";
     }
   }
@@ -213,6 +216,7 @@ export class FridaManager {
         throw new Error(`Device with ID ${deviceId} not found`);
       }
 
+      console.log(`Launching app ${appId} on device ${deviceId}...`);
       const pid = await device.spawn(appId);
       device.resume(pid);
       const session = await device.attach(pid);
@@ -239,7 +243,10 @@ export class FridaManager {
    * @param processID The process ID
    * @returns Frida session
    */
-  async attachApp(deviceId: string, processID: number): Promise<frida.Session> {
+  async attachToApp(
+    deviceId: string,
+    processID: number
+  ): Promise<frida.Session> {
     try {
       const device = await this.getDeviceById(deviceId);
 

@@ -1,22 +1,32 @@
-import { spawn } from "child_process";
+#!/usr/bin/env node
+
+const cp = require("child_process");
 
 const tasks = {
   client: {
     cmd: "vite",
     args: ["--host"],
-    cwd: "src/gui",
+    cwd: "app/gui",
   },
   server: {
     cmd: "npx",
     args: ["nodemon", "server.ts"],
-    cwd: "src/server",
+    cwd: "app/server",
   },
 };
 
 function run() {
   for (var task in tasks) {
     const { cmd, args, cwd } = tasks[task];
-    spawn(cmd, args, { cwd });
+    cp.spawn(
+      cmd,
+      args,
+      { cwd },
+      {
+        stdio: "inherit",
+        shell: true,
+      }
+    );
     console.log("Spawned", task);
   }
 }

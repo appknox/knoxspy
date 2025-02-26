@@ -1,4 +1,3 @@
-
 <template>
     <div class="page page-dashboard">
         <Toast />
@@ -13,7 +12,7 @@
                     </template>
                     <span class="ml-2" style="line-height: 38px;"><b>'{{sess.session.name}}'</b> session is currently in use!</span>
                     <Button severity="danger" label="Disconnect" text style="margin-left: 20px;" @click="clearActiveSession"/>
-                    <Button severity="success" label="Open" text style="margin-left: 20px;" @click="clearActiveSession"/>
+                    <Button severity="success" label="Open" text style="margin-left: 20px;" @click="openAppsPage"/>
                 </Message>
                 <div style="display: flex; align-items: start; border-radius: 10px" id="sessionSelection" :class="isSessionActive ? 'disabled' : ''">
                     <div style="display: flex; flex-direction: column; flex-grow: 1; flex-basis: 0; padding: 20px; ">
@@ -110,13 +109,10 @@ export default defineComponent({
 
                 if(tmpActiveSession.name) {
                     console.log("Found an active session! Trying to restore last session");
-                    console.log(message['session'], 'config' in message['session']);
                     
                     if('session' in message && 'config' in message['session']) {
                         console.log("Valid config found!");
-                        const tmpSessionConfig = JSON.parse(message['session']['config']);
-                        console.log(tmpSessionConfig);
-                        console.log(tmpSessionConfig['sessionStoreSession']);
+                        const tmpSessionConfig = message['session']['config'];
                         
                         if('sessionStoreSession' in tmpSessionConfig) {
                             tmpLastSessionConfig["session"] = tmpSessionConfig['sessionStoreSession'];
@@ -132,15 +128,6 @@ export default defineComponent({
                     }
                     
                     console.log("Last Config:", tmpLastSessionConfig);
-                    // this.sess.$patch({'startupAppConfig': JSON.parse(message['session']['config'])['sessionStoreSession']})
-                    // console.log(tmpLastSessionConfig.name, tmpLastSessionConfig.id);
-                    // if(this.sess.session.name !== tmpLastSessionConfig.name) {
-                    //     console.log("Last session used was different: ", tmpLastSessionConfig);
-                        
-                    // }
-                    // console.log(message['session']);
-                    
-                    // console.log(this.sess.startupAppConfig);
                 }
                 
                 if(message['session'].name != null) {
@@ -183,6 +170,9 @@ export default defineComponent({
         };
     },
     methods: {
+        openAppsPage() {
+            this.$router.push('/apps');
+        },
         deleteSession() {
             if(!this.selectedSession || this.selectedSession == "") {
                 alert("No session selected!")

@@ -8,12 +8,12 @@
                     <div class="section-header-device">
                         <h4>Apps For</h4>
                         <!-- <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" optionValue="value" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value" /> -->
-                        <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" @change="fetchApps" placeholder="Select a Device" class="w-full md:w-14rem" :placeholder="selectedDevice.value">
+                        <Dropdown v-model="selectedDevice" :options="data" optionLabel="name" @change="fetchApps" class="w-full md:w-14rem" :placeholder="selectedDevice?.value || 'Select a Device'">
                             <template #value="slotProps">
                                 <div v-if="slotProps.value" class="flex align-items-center">
                                     <div v-if="slotProps.value.platform === 'iOS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.value.name }}</div>
                                     <div v-if="slotProps.value.platform === 'Android'"><i style="margin-right: 5px;" class="pi pi-android"></i>{{ slotProps.value.name }}</div>
-                                    <div v-if="slotProps.value.platform === 'unknown'"><i style="margin-right: 5px;" class="pi pi-times"></i>{{ slotProps.value.name }}</div>
+                                    <div v-if="slotProps.value.platform === 'Unknown'"><i style="margin-right: 5px;" class="pi pi-times"></i>{{ slotProps.value.name }}</div>
                                 </div>
                                 <span v-else>
                                     {{ slotProps.placeholder }}
@@ -23,7 +23,7 @@
                                 <div class="flex align-items-center">
                                     <div v-if="slotProps.option.platform === 'iOS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.option.name }}</div>
                                     <div v-if="slotProps.option.platform === 'Android'"><i style="margin-right: 5px;" class="pi pi-android"></i>{{ slotProps.option.name }}</div>
-                                    <div v-if="slotProps.option.platform === 'unknown'"><i style="margin-right: 5px;" class="pi pi-times"></i>{{ slotProps.option.name }}</div>
+                                    <div v-if="slotProps.option.platform === 'Unknown'"><i style="margin-right: 5px;" class="pi pi-times"></i>{{ slotProps.option.name }}</div>
                                 </div>
                             </template>
                         </Dropdown>
@@ -67,7 +67,7 @@
                 </div>
                 <ul class="app-list" v-if="data">
                     <ContextMenu ref="menu" :model="appMenu" />
-                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.identifier, item.name)" @contextmenu="onRightClick($event, item)">
+                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.id, item.name)" @contextmenu="onRightClick($event, item)">
                         <img :src="item.icon">
                         <p>{{ item.name }}</p>
                     </li>
@@ -99,7 +99,7 @@
                                             </div>
                                         </template>
                                     </Dropdown>
-                                    <Button label="Auto-Detect" icon="pi pi-refresh" @click="toggleAutoDetectOverlay" />
+                                    <!-- <Button label="Auto-Detect" icon="pi pi-refresh" @click="toggleAutoDetectOverlay" /> -->
                                     <div class="overlay-auto-detrefdect" v-if="libraryDetectionPopup">
                                         <div class="flex flex-column gap-3 w-25rem">
                                             <div>
@@ -262,19 +262,10 @@ export default defineComponent({
 
         this.ws.onmessage = (event: { data: string; }) => {
             const message = JSON.parse(event.data);
-            // console.log("New Message");
-            // console.log(message);
-            
             
             if(message['action'] === 'devices') {
-                // console.log(message);
-                this.data = []
-                for(const a in message['devices']) {
-                    const b = message['devices'][a];
-                    console.log("New Device List:", {"name": b.name, "value": b.id, "platform": b.platform, 'id': b.id});
-                    
-                    this.data.push({"name": b.name, "value": b.id, "platform": b.platform, 'id': b.id});
-                }
+                this.data = message['devices'];
+
                 if(this.sess.app.deviceId != null && this.sess.app.deviceId.trim() !== "") {
                     const tmpDevice = message.devices.filter((item) => {if(item.id == this.sess.app.deviceId) {return item;}})
                     if(tmpDevice.length > 0) {
@@ -285,14 +276,12 @@ export default defineComponent({
                         this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Previously attached device got disconnected!', life: 3000 });
                     }
                     
-                } else if(this.data.length == 1) {
-                    // console.log("New Device:", message['devices'][0]);
-                    
+                } else if(this.data.length == 1) {                    
                     this.selectedDevice = message['devices'][0]
                     this.sess.$patch({app: {deviceId: this.selectedDevice.id}})
                     this.fetchApps()
                 }
-            } else if(message['action'] === 'apps') {
+            } else if (message['action'] === 'apps') {
                 this.apps = message['apps'];
             } else if(message['action'] === 'startApp') {
                 this.isSpawned = true;
@@ -374,7 +363,7 @@ export default defineComponent({
         },
         onRightClick(event: any, item: any) {
             
-            this.rightClickMenuIdentifier = item.identifier
+            this.rightClickMenuIdentifier = item.id
             this.rightClickMenuApp = item.name
             this.$refs.menu.show(event);
         },

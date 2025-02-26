@@ -161,7 +161,7 @@ export default defineComponent({
             platformName: '',
             repeaterTabTitleConfirmInput: "",
             confirm: useConfirm(),
-            isPlatformDetectionVisible: true,
+            isPlatformDetectionVisible: false,
             dataTableHeight: "calc(60vh - 50px)",
             activeRepeaterTab: 0,
             activeRepeaterData: "",
@@ -272,8 +272,8 @@ export default defineComponent({
             console.log(message.action);
             // console.log(message.message);
             
-            if(message.action == "trafficInit") {
-                this.rows = JSON.parse(message.message);
+            if (message.action == "trafficInit") {                
+                this.rows = message.message;
             } else if(message.action == "trafficUpdate") {
                 this.rows.push(message.message);
             } else if(message.action == "repeaterAdd") {
