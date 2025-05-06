@@ -1,7 +1,9 @@
 # KnoxSpy
 
-<img alt="image" src="https://github.com/ajay-appknox/mdm_dashboard/assets/98275091/a6c05942-be1c-4b3b-bb68-373a9a6faf57">
-
+<img src="./screenshots/session.png">
+<img src="./screenshots/apps.png">
+<img src="./screenshots/app_spawn.png">
+<img src="./screenshots/proxy.png">
 
 ### Installation
 1. Clone the repo:
@@ -10,8 +12,10 @@
     ```
 2. Install dependencies:
     ```bash
-    cd knoxspy/app/gui && npm i
-    cd ../server && npm i && cd ../..
+    cd knoxspy
+    cd app/gui && npm i
+    cd ../server && npm i
+    cd ../..
     ```
 ### Usage
 
@@ -19,3 +23,8 @@
 2. Run `./knoxspy` shell script to start server & client.
 3. Open http://localhost:5173 to access the app.
 4. Create a new session and open it.
+5. Spawn the target app and attach the network library script to it.
+6. Open proxy tab and start capturing APIs.
+
+> [!NOTE]
+> You can provide your own script and use it instead of bundled scripts.
