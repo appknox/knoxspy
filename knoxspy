@@ -4,8 +4,8 @@ const cp = require("child_process");
 
 const tasks = {
   client: {
-    cmd: "vite",
-    args: ["--host"],
+    cmd: "npx",
+    args: ["vite", "--host"],
     cwd: "app/gui",
   },
   server: {
