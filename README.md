@@ -28,3 +28,7 @@
 
 > [!NOTE]
 > You can provide your own script and use it instead of bundled scripts.
+
+### License
+
+This project is licensed under Apache-License 2.0.
