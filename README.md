@@ -1,6 +1,6 @@
 # KnoxSpy
 
-KnoxSpy tool developed by **Appknox**, was designed to fill the gap in effective tools for intercepting and analyzing MDM traffic. It allows you to capture and replay requests. With its user-friendly interface, KnoxSpy simplifies the process of visualizing and monitoring network traffic. This tool is free, easy to install, and highly adaptable, supporting not just MDM applications but also a variety of other Android and iOS apps.
+KnoxSpy tool developed by **Appknox**, was designed to fill the gap in effective tools for intercepting and analyzing MDM traffic. It allows you to capture and replay requests. With its user-friendly interface, KnoxSpy simplifies the process of visualizing and monitoring network traffic. This tool is open-source, easy to install, and highly adaptable, supporting not just MDM applications but also a variety of other Android and iOS apps.
 
 ![](./screenshots/android.gif)
 
