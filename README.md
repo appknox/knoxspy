@@ -12,7 +12,6 @@ KnoxSpy tool developed by **Appknox**, was designed to fill the gap in effective
     ```
 - Install dependencies
     ```bash
-    cd knoxspy
     cd app/gui && npm i
     cd ../server && npm i
     ```
