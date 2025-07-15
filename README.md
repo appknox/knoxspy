@@ -42,7 +42,7 @@ KnoxSpy tool developed by **Appknox**, was designed to fill the gap in effective
     - Real-time traffic monitoring
 
 2. **Extensive Network Library Support**
-    - iOS 
+    - iOS
         - Alamofire
         - TrustKit
         - AFNetworking
@@ -58,11 +58,9 @@ KnoxSpy tool developed by **Appknox**, was designed to fill the gap in effective
 
 5. **Multi-Session Management**
 
-&nbsp;
-
 > [!NOTE]
 > You can provide your own script and use it instead of bundled scripts.
 
-### License
+## License
 
 This project is licensed under Apache-License 2.0.
