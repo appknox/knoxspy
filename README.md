@@ -1,6 +1,6 @@
 # KnoxSpy
 
-KnoxSpy is an open source penetration testing tool developed by **Appknox**, was designed to fill the gap in effective tools for intercepting and analyzing MDM traffic. It allows you to capture and replay requests. With its user-friendly interface, KnoxSpy simplifies the process of visualizing and monitoring network traffic. This tool is open-source, easy to install, and highly adaptable, supporting not just MDM applications but also a variety of other Android and iOS apps.
+The KnoxSpy is an open source penetration testing tool developed by **Appknox**, was developed to fill the gap in effective tools effective tools for intercepting and analyzing MDM traffic through dynamic instrumentation with Frida. It integrates with the network libraries of the target application to capture traffic prior to its entry into the MDM tunnel and subsequent to its exit, allowing for real-time inspection and modification of API calls. KnoxSpy streamlines the visualization and monitoring of network traffic. It accommodating not only MDM applications but also a range of other Android and iOS applications.
 
 ![](./screenshots/android.gif)
 
