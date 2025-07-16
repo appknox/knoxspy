@@ -6,7 +6,7 @@ The KnoxSpy is an open-source penetration testing tool developed by **Appknox**,
 
 ## Installation
 
-- You can download knoxyspy by cloning the Git repository
+- You can download KnoxSpy by cloning the Git repository
     ```plain
     git clone https://github.com/appknox/knoxspy.git
     ```
@@ -18,7 +18,7 @@ The KnoxSpy is an open-source penetration testing tool developed by **Appknox**,
 
 ## Usage
 
-1. Install Frida server on your device and connect the device to your computer via USB.
+1. Install the Frida server on your device and connect the device to your computer via USB.
 2. Launch KnoxSpy
     ```plain
     ./knoxspy
@@ -27,10 +27,10 @@ The KnoxSpy is an open-source penetration testing tool developed by **Appknox**,
     ```plain
     http://localhost:5173/
     ```
-4. Click "Create new Session" button.
+4. Click the "Create new Session" button.
 5. Select the newly created session to open it.
 6. Click on the application to spawn it.
-7. Choose the network library script from available options.
+7. Choose the network library script from the available options.
 8. Navigate to the "Proxy" tab in the dashboard to monitor the API calls.
 
 ## Features
@@ -49,7 +49,7 @@ The KnoxSpy is an open-source penetration testing tool developed by **Appknox**,
         - OkHttp3
 
 3. **Extensible Architecture**
-    - Custom network library integration
+    - Able to manage libraries, both new and existing for Android and iOS apps.
 
 4. **Wide Application Coverage**
     - Compatible with MDM applications
@@ -58,7 +58,7 @@ The KnoxSpy is an open-source penetration testing tool developed by **Appknox**,
 5. **Multi-Session Management**
 
 > [!NOTE]
-> You can provide your own script and use it instead of bundled scripts.
+> You can provide your script and use it instead of the bundled scripts.
 
 ## License
 
