@@ -10,7 +10,7 @@
 <img src="https://img.shields.io/badge/Frida-16.2.1-red" alt="Frida">
 <img src="https://img.shields.io/badge/Language-TypeScript%20%7C%20JavaScript-blue" alt="Language">
 <img src="https://img.shields.io/badge/License-Apache%202.0-yellow" alt="License">
-<img src="https://img.shields.io/badge/DEF%20CON-31-black" alt="DEF CON">
+<img src="https://img.shields.io/badge/DEF%20CON-33-black" alt="DEF CON">
 
 </div>
 
