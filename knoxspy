@@ -29,6 +29,7 @@ function run() {
     );
     console.log("Spawned", task);
   }
+  console.log("Access the GUI at http://localhost:5173");
 }
 
 run();
