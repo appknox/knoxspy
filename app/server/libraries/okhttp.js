@@ -1,0 +1,128 @@
+Java.perform(function () {
+    var OkHttpClient = Java.use('okhttp3.OkHttpClient');
+    var Buffer = Java.use('okio.Buffer');
+    var RequestBuilder = Java.use("okhttp3.Request$Builder");
+
+
+    RequestBuilder.build.implementation = function () {
+        var request = this.build();
+        var method = request.method();
+        var url = request.url().toString();
+        var requestBody = request.body();
+        var bodyStr = "";
+
+        if (requestBody !== null) {
+            try {
+                var buffer = Buffer.$new();
+                requestBody.writeTo(buffer);
+                bodyStr = buffer.readUtf8();
+            } catch (e) {
+                bodyStr = "[Failed to read body]";
+            }
+        }
+
+        // console.log("➡️  HTTP Request:");
+        // console.log("   Method: " + method);
+        // console.log("   URL: " + url);
+        // if (bodyStr.length > 0) {
+        //     console.log("   Body: " + bodyStr);
+        // } else {
+        //     console.log("   Body: <empty>");
+        // }
+
+        return request;
+    };
+
+    OkHttpClient.newCall.overload('okhttp3.Request').implementation = function (request) {
+        var requestUrl = request.url().toString();
+        var protocol = request.url().scheme();
+        var requestBody = request.body();
+        var method = request.method().toString();
+        const requestList = requestUrl.split("/");
+        const requestHost = requestList[2];
+        const URL = requestUrl.split(requestHost)[1];
+        var contentLength = requestBody ? requestBody.contentLength() : 0;
+        var buffer = Buffer.$new();
+        var requestBodyString = '';
+        var contentType = '';
+        var headersArr = [];
+        var hostHeader = `Host: ${requestHost}`;
+        headersArr.push(hostHeader);
+        if (contentLength > 0) {
+            requestBody.writeTo(buffer);
+            if (buffer.size() !== 0) {
+                requestBodyString = buffer.readUtf8();
+                contentType = requestBody.contentType();
+                var contentHeader = `Content-Type: ${contentType}`;
+                headersArr.push(contentHeader);
+            }
+        }
+        // HTTP headers here
+        var requestHeaders = request.headers();
+        var requestHeaderNames = requestHeaders.names();
+        var requestHeaderNamesArray = requestHeaderNames.toArray();
+        for (var i = 0; i < requestHeaderNamesArray.length; i++) {
+            var headerName = requestHeaderNamesArray[i];
+            var headerValue = requestHeaders.get(headerName);
+            var finalValue = `${headerName}: ${headerValue}`;
+            if(headerName == i) {
+                if (headerName !== 'host') {
+                    headersArr.push(headerValue);
+                }
+            } else {
+                if (headerName !== 'host') {
+                    headersArr.push(finalValue);
+                }
+            }
+        }
+        console.log("[LOG] Request headers:", headersArr);
+        try {
+            headersArr = headersArr.filter((item, index) => headersArr.indexOf(item) === index);
+            // Response data here
+            var response = this.newCall(request).execute();
+            var responseHeaders = response.headers();
+            var responseHeaderNames = responseHeaders.names();
+            var responseHeaderNamesArray = responseHeaderNames.toArray();
+            var responseStatus = response.code();
+            var responseMessage = response.message();
+            var responseProtocol = response.protocol().toString();
+            var respHeaders = [`${responseProtocol.toUpperCase()} ${responseStatus} ${responseMessage}`];
+            for (var i = 0; i < responseHeaderNamesArray.length; i++) {
+                var responseHeaderName = responseHeaderNamesArray[i];
+                var responseHeaderValue = responseHeaders.get(responseHeaderName);
+                var finalValue = `${responseHeaderName}: ${responseHeaderValue}`;
+                respHeaders.push(finalValue);
+            }
+
+            // Response body
+            var responseBodyString = '';
+            var responseBody = response.body();
+            if (responseBody !== null) {
+                if (response.isSuccessful()) {
+                    responseBodyString = responseBody.string();
+                } 
+                else {
+                    console.log("Error: Response not successful");
+                    }
+                } else {
+                console.log("Error: Empty response body");
+            }
+            const tmpPayload = {
+                'method': method,
+                'protocol': protocol,
+                'host':requestHost,
+                'endpoint': URL,
+                'request_headers': JSON.stringify(headersArr),
+                'request_body': requestBodyString,
+                'status_code': responseStatus,
+                'response_headers': JSON.stringify(respHeaders),
+                'response_body': responseBodyString
+            }
+            send(JSON.stringify(tmpPayload))
+        } catch (error) {
+            console.error("Error in OkHttp hook:", error);
+        }
+        return this.newCall(request);    
+    };
+
+});
