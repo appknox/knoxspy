@@ -1,20 +1,6 @@
 <template>
     <div class="page">
         <div id="app-wrapper">
-            <div style="display: none; flex-direction: column; gap: 10px; width: 800px; flex-wrap: wrap;">
-                <div style="display: flex; flex-direction: row; gap: 10px;">
-                    <p>App Selected: <b>{{  currentSession.app.selectedApp ? currentSession.app.selectedApp.name : "No app selected" }}</b></p>
-                    <p>Connected App: <b>{{  currentSession.app.connectedApp ? (currentSession.app.connectedApp.app ? currentSession.app.connectedApp.app.name : "No app connected") : "No app connected" }}</b></p>
-                    <p>Connected Device: <b>{{  currentSession.app.connectedApp ? (currentSession.app.connectedApp.device ? currentSession.app.connectedApp.device.name : "No device connected") : "No device connected" }}</b></p>
-                </div>
-                <div style="display: flex; flex-direction: row; gap: 10px;">
-                    <p>isLoaded: <b>{{  isLoaded }}</b></p>
-                    <p>isDeviceReady: <b>{{  currentSession.app.isDeviceReady }}</b></p>
-                    <p>isSpawned: <b>{{  isSpawned }}</b></p>
-                    <p>isConnecting: <b>{{  isConnecting }}</b></p>
-                    <p>isConnected: <b>{{  currentSession.app.connectedApp ? currentSession.app.connectedApp.status : "No app connected" }}</b></p>
-                </div>
-            </div>
             <Card style="width: 25rem; overflow: hidden">
                 <template #content v-if="!isConnecting && currentSession.app.selectedApp">
                     <img :src="currentSession.app.selectedApp.icon" style="width: 150px; height: 150px;">
@@ -84,12 +70,7 @@ export default defineComponent({
             selectedLibraryB64: "",
             isConnecting: false,
             connectionSessionId: -1,
-            libraryList: [
-                { name: "AFNetworking", file: "afnetworking.js", platform: "iOS" },
-                { name: "TrustKit", file: "trustkit.js", platform: "iOS" },
-                { name: "AlamoFire", file: "alamofire.js", platform: "iOS" },
-                { name: "OkHTTP", file: "okhttp.js", platform: "android" }
-            ],
+            libraryList: [],
             currentSession: useAppStore(),
             ws: useWebSocketStore(),
             package_name: this.$route.query.app || "",
