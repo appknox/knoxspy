@@ -701,14 +701,17 @@ export default defineComponent({
     },
     mounted() {
         console.log("HTTPTraffic: Page mounted");
-        this.isConnected = true;
-        this.ws.send(JSON.stringify({action: "getTraffic", session: this.currentSession.app.selectedSession.id}))
-        const grid = document.querySelector('revo-grid');
-        if (grid) {
-            grid.resize = true;
-            grid.autoSizeColumn = true;
+        if(!this.currentSession.app.selectedSession) {
+            this.$router.push('/');
+        } else {
+            this.isConnected = true;
+            this.ws.send(JSON.stringify({action: "getTraffic", session: this.currentSession.app.selectedSession.id}))
+            const grid = document.querySelector('revo-grid');
+            if (grid) {
+                grid.resize = true;
+                grid.autoSizeColumn = true;
+            }
         }
-        // this.setupEditor()
     },
 	unmounted() {
 		console.log("Unmounting HTTPTraffic");

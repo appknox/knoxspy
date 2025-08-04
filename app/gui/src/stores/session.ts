@@ -19,6 +19,8 @@ export const useAppStore = defineStore('current_session', {
                 apps: false,
                 libraries: false,
             },
+            users: [],
+            extraApps: [],
             isSessionActive: false,
             isDeviceReady: false,
             wsConnected: false,
@@ -29,6 +31,7 @@ export const useAppStore = defineStore('current_session', {
             sessionsList: [],
             devices: [],
             apps: [],
+            workApps: [],
             connectedApp: null,
             libraries: [
                 { name: "AFNetworking", file: "afnetworking.js", platform: "iOS" },
@@ -85,12 +88,19 @@ export const useAppStore = defineStore('current_session', {
         },
         setSelectedSession(session: any) {
             this.app.selectedSession = session
-            localStorage.setItem('selectedSession', JSON.stringify(session))
-            if(session.id != -1) {
-                this.app.isSessionActive = true
+            if(session) {
+                localStorage.setItem('selectedSession', JSON.stringify(session))
+                if(session.id != -1) {
+                    this.app.isSessionActive = true
+                } else {
+                    this.app.isSessionActive = false
+                }
+                console.log("[SessionStore] Selected session set", session, ', is active:', this.app.isSessionActive)
             } else {
+                localStorage.setItem('selectedSession', '')
                 this.app.isSessionActive = false
             }
+            
         },
         clearSelectedSession() {
             this.app.selectedSession = null
@@ -114,12 +124,16 @@ export const useAppStore = defineStore('current_session', {
         setApps(apps: any) {
             this.app.apps = apps
         },
-        setSelectedApp(app: any, custom: boolean = false) {
+        setSelectedApp(app: any, custom: boolean = false, workApp: boolean = false) {
             console.log("App selected:", app, custom)
             if(custom) {
                 this.app.selectedApp = app
             } else {
-                this.app.selectedApp = this.app.apps.find((a: any) => a.id === app)
+                if(workApp) {
+                    this.app.selectedApp = this.app.workApps.find((a: any) => a.id === app)
+                } else {
+                    this.app.selectedApp = this.app.apps.find((a: any) => a.id === app)
+                }
             }
             console.log(this.app.selectedApp)
         },

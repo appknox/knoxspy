@@ -84,6 +84,9 @@ export default defineComponent({
         this.ws.addOnMessageHandler(this.wsMessage);
     },
     async mounted() {
+        if(!this.currentSession.app.selectedSession) {
+            this.$router.push('/');
+        }
         console.log("AppSelector(mounted): Page mounted");
         console.log("AppSelector(mounted): is websocket connected?", this.ws.isConnected);
         console.log("AppSelector(mounted): is dashboard ready?", this.currentSession.app.isDashboardReady);
@@ -115,7 +118,7 @@ export default defineComponent({
             console.log("AppSelector(wsReady): WebSocket ready");
             await this.currentSession.getConnectedApp();
             console.log("AppSelector(wsReady): Connected app:", this.currentSession.app.connectedApp.app);
-            this.pageSetup();
+            // this.pageSetup();
         },
         async checkAppConnected() {
             await this.currentSession.getConnectedApp();
@@ -134,7 +137,7 @@ export default defineComponent({
         },
         async pageSetup() {
             if(this.currentSession.app.connectedApp && this.currentSession.app.connectedApp.status) {
-                if(this.currentSession.app.connectedApp.app.identifier === this.currentSession.app.selectedApp.id) {
+                if(this.currentSession.app.connectedApp.app && this.currentSession.app.connectedApp.app.identifier === this.currentSession.app.selectedApp.id) {
                     console.log("AppSelector(pageSetup): App is connected");
                     this.isLoaded = true;
                     this.isSpawned = true;
@@ -153,14 +156,17 @@ export default defineComponent({
                 this.$router.push("/apps");
             }
         },
-        wsMessage(message: any) {
+        async wsMessage(message: any) {
             message = JSON.parse(message);
             console.log("AppSelector(wsMessage): Message:", message, message.action);
             if(message.action === "deviceUpdate") {
                 if(message.message === "Connected") {
+                    await this.currentSession.getConnectedApp();
+                    const t_user = this.$route.query.user || "User";
+                    const t_user_flag = t_user === "User" ? false : true;
                     console.log("AppSelector(wsMessage): Device update received");
                     console.log("AppSelector(wsMessage): Connected app:", this.currentSession.app.connectedApp, "Selected app:", this.currentSession.app.selectedApp);
-                    
+                    this.currentSession.setSelectedApp(this.currentSession.app.connectedApp.app.identifier, false, t_user_flag);
                 }
             } else if(message.action === "libraries") {
                 this.libraryList = message.libraries;
@@ -221,6 +227,7 @@ export default defineComponent({
                 "action": action,
                 "deviceId": t_device,
                 "appId": packageName,
+                "user": this.$route.query.user ? this.$route.query.user : 0,
                 "platform": this.currentSession.app.selectedDevice ? this.currentSession.app.selectedDevice.platform : "NA",
                 "appName": this.currentSession.app.selectedApp ? this.currentSession.app.selectedApp.name : packageName,
                 "library": this.currentSession.app.selectedLibrary ? this.currentSession.app.selectedLibrary.file : null

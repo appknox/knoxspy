@@ -155,7 +155,7 @@ import { useAppStore, useWebSocketStore } from "../stores/session";
 import InlineMessage from "primevue/inlineMessage";
 
 export default defineComponent({
-	emits: ["sessionUpdated", "deviceUpdated", "appUpdated", "libraryUpdated", "appListUpdated", "appConnected", "appDisconnected", "dashboardUpdated"],
+	emits: ["sessionUpdated", "deviceUpdated", "appUpdated", "libraryUpdated", "appListUpdated", "appConnected", "appDisconnected", "dashboardUpdated", "workAppListUpdated"],
 	name: "Footer",
 	data() {
         return {
@@ -186,6 +186,10 @@ export default defineComponent({
 		this.ws.addOnMessageHandler(this.wsMessage);
 	},
 	methods: {
+		handleSidebarToggle(isOpen) {
+			console.log("[Footer] handleSidebarToggle", isOpen);
+			$(".status-indicator-wrapper").css("left", isOpen ? "51px" : "0");
+		},
 		toggleDropdown(key) {
 			this.showDropdown[key] = !this.showDropdown[key];
 			if (this.showDropdown[key]) {
@@ -252,7 +256,9 @@ export default defineComponent({
 				const t_sess = this.currentSession.app.sessions.find(session => session.id === this.currentSession.app.selectedSession.id);
 				this.currentSession.setSelectedSession(t_sess);
 				console.log("Footer(wsMessage): Sessions:", this.currentSession.app.sessions, "selected:", t_sess);
-				this.currentSession.setSessionActive(true);
+				if(t_sess) {
+					this.currentSession.setSessionActive(true);
+				}
 				this.$emit("sessionUpdated", t_sess);
 				this.currentSession.setDashboardPhase("sessions", true);
 				this.currentSession.checkDeviceReady();
@@ -274,21 +280,53 @@ export default defineComponent({
 					this.currentSession.checkDeviceReady();
 					console.log("Footer(wsMessage): Devices:", this.currentSession.app.devices);
 					this.loadingDropdown.app = true;
-					this.ws.send(JSON.stringify({ action: "apps", deviceId: this.currentSession.app.selectedDevice.id }));
+					this.ws.send(JSON.stringify({ action: "apps", deviceId: this.currentSession.app.selectedDevice.id, platform: this.currentSession.app.selectedDevice.platform }));
 				}
 			} else if (message.action == "apps") {
 				this.loadingDropdown.app = false;
 				this.currentSession.app.apps = message.apps;
+				let t_users = message.usersInfo.filter(user => {
+					if (user.id >= 10) {
+						return user;
+					}
+				});
+				const t_default_user = {
+					id: '0',
+					name: "User"
+				}
+				t_users = [t_default_user, ...t_users];
+				this.currentSession.app.users = [...t_users];
+				this.currentSession.app.extraApps = t_users.map(user => {
+					return {
+						id: user.id,
+						name: user.name
+					}
+				});
 				this.$emit("appListUpdated", this.currentSession.app.apps);
+				this.$emit("workAppListUpdated", this.currentSession.app.extraApps);
 				console.log("Footer(wsMessage): Apps received:", message.apps.length);
+				console.log("Footer(wsMessage): Work apps received:", this.currentSession.app.extraApps);
+				console.log("Footer(wsMessage): Users received:", this.currentSession.app.users);
 				if(this.currentSession.app.apps.length > 0) {
 					if(this.currentSession.app.connectedApp.status) {
 						console.log("Footer(wsMessage): App selected from connected app", this.currentSession.app.connectedApp);
-						this.currentSession.setSelectedApp(this.currentSession.app.apps.find(app => app.id === this.currentSession.app.connectedApp.app.identifier), true);
-						this.$emit("appUpdated", this.currentSession.app.selectedApp);
+						let t_selected_app = this.currentSession.app.apps.find(app => app.id === this.currentSession.app.connectedApp.app.identifier);
+						if (!t_selected_app) {
+							t_selected_app = this.currentSession.app.workApps.find(app => app.id === this.currentSession.app.connectedApp.app.identifier);
+							this.currentSession.setSelectedApp(t_selected_app, true, true);
+						} else {
+							this.currentSession.setSelectedApp(t_selected_app, true, false);
+						}
+						this.$emit("appUpdated", t_selected_app);
 					} else if (t_query.app) {
-						this.currentSession.setSelectedApp(this.currentSession.app.apps.find(app => app.id === t_query.app), true);
-						this.$emit("appUpdated", this.currentSession.app.selectedApp);
+						let t_selected_app = this.currentSession.app.apps.find(app => app.id === t_query.app);
+						if (!t_selected_app) {
+							t_selected_app = this.currentSession.app.workApps.find(app => app.id === t_query.app);
+							this.currentSession.setSelectedApp(t_selected_app, true, true);
+						} else {
+							this.currentSession.setSelectedApp(t_selected_app, true, false);
+						}
+						this.$emit("appUpdated", t_selected_app);
 						if(this.didPageLoad) {
 							this.startApp(t_query.app, "spawn");
 						}
@@ -623,6 +661,7 @@ circle {
 
 /* Group for all status indicators */
 .status-indicator-wrapper {
+    transition: all ease-in-out .4s;
     background-color: #d3d9e4;
 	background-color: #eee;
 	border-top: 1px solid #dfdfdf;
@@ -799,6 +838,11 @@ circle {
 	.status-group-right {
 		gap: 10px;
 	}
-		
+	.status-text span:first-child {
+		display: none;
+	}
+	.status-text span:nth-of-type(2) {
+		margin-left: 5px;
+	}
 }
 </style>

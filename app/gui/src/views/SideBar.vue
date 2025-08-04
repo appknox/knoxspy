@@ -6,10 +6,10 @@
             <h1 :class="{'active': isSidebarOpen}">KnoxSpy</h1>
         </div>
         <ul>
-            <li><router-link to="/"><i class="pi pi-home" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Dashboard</span></router-link></li>
+            <li><router-link to="/"><i class="pi pi-home" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Sessions</span></router-link></li>
             <li><router-link to="/apps"><i class="pi pi-th-large" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Apps</span></router-link></li>
             <li><router-link to="/traffic"><i class="pi pi-history mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">HTTP Traffic</span></router-link></li>
-            <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Library Manager</span></router-link></li>
+            <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Libraries</span></router-link></li>
         </ul>
     </div>
 </template>
@@ -23,6 +23,7 @@ import OverlayPanel from 'primevue/overlaypanel';
 import Toast from 'primevue/toast';
 import Dropdown from 'primevue/dropdown';
 import Tag from 'primevue/tag';
+import $ from 'jquery';
 
 export default defineComponent({
 	name: 'SideBar',
@@ -55,6 +56,7 @@ export default defineComponent({
         },
         toggleSidebar() {            
             this.isSidebarOpen = !this.isSidebarOpen;
+            $(".status-indicator-wrapper").css("left", this.isSidebarOpen ? "200px" : "51px").css("width", this.isSidebarOpen ? "calc(100% - 201px)" : "calc(100% - 52px)");
         },
         handleReload(event: any) {
             // event.preventDefault();

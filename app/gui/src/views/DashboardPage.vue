@@ -1,5 +1,5 @@
 <template>
-    <Header @sessionUpdated="refreshSessionInfo"></Header>
+    <Footer @sessionUpdated="refreshSessionInfo"></Footer>
     <div class="page page-dashboard">
         <Card style="width: 40rem; overflow: hidden">
             <template #header>
@@ -10,7 +10,7 @@
                     <template #messageicon>
                         <i class="pi pi-info-circle" style="margin-right: 10px;"></i>
                     </template>
-                    <span class="ml-2" style="line-height: 38px;"><b>'{{currentSession.app.selectedSession.name}}'</b> session is currently in use!</span>
+                    <span class="ml-2" style="line-height: 38px;"><b>'{{currentSession.app.selectedSession ? currentSession.app.selectedSession.name : 'No session selected'}}'</b> session is currently in use!</span>
                     <Button severity="danger" label="Disconnect" text style="margin-left: 20px;" @click="clearActiveSession"/>
                     <Button severity="success" label="Open" text style="margin-left: 20px;" @click="openAppsPage"/>
                 </Message>
@@ -20,7 +20,7 @@
                             Create A New Session
                         </p>
                         <div style="gap: 10px; display: flex; flex-direction: column;">
-                            <InputText v-model="newSessionName" placeholder="Session Name" />
+                            <InputText v-model="newSessionName" placeholder="Session Name" autocomplete="off"/>
                             <Button label="Create New" size="small" @click="createNewSession"/>
                         </div>
                     </div>
@@ -48,7 +48,7 @@ import Listbox from 'primevue/listbox';
 import { useAppStore, useWebSocketStore, usePageReadyEmitter } from '../stores/session';
 import Message from 'primevue/message';
 import Toast from 'primevue/toast';
-import Header from '../components/Footer.vue';
+import Footer from '../components/Footer.vue';
 
 export default defineComponent({
     name: 'DashboardPage',
@@ -59,7 +59,7 @@ export default defineComponent({
         InputText,
         Message,
         Toast,
-        Header
+        Footer
     },
     data() {
         return {
@@ -106,6 +106,9 @@ export default defineComponent({
                 if(message.status) {
                     this.currentSession.app.selectedSession = null
                     this.currentSession.app.sessionsList = this.currentSession.app.sessionsList.filter((session: any) => session.id !== message.session)
+                    if(this.currentSession.app.sessionsList.length == 0) {
+                        localStorage.removeItem('selectedSession')
+                    }
                 }
             }
         },

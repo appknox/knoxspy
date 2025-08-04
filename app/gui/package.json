@@ -17,6 +17,7 @@
     "highlight.js": "^11.9.0",
     "http-message-parser": "^0.0.34",
     "http-parser-js": "^0.5.8",
+    "jquery": "^3.7.1",
     "mitt": "^3.0.1",
     "pinia": "^2.1.7",
     "primeicons": "^7.0.0",

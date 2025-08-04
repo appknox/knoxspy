@@ -47,7 +47,7 @@
                                     <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
                                         <div class="card">
                                             <FloatLabel style="width: 400px; margin: 30px auto 30px;">
-                                                <InputText id="username" v-model="libraryNameValue" style="width: 350px;" @input="changeSelectedPlatform"/>
+                                                <InputText id="username" v-model="libraryNameValue" style="width: 350px;" @input="changeSelectedPlatform" autocomplete="off"/>
                                                 <label for="username" style="width: 350px;">Library Name</label>
                                             </FloatLabel>
                                             <Dropdown style="width: 350px;" v-model="selectedPlatform" @change="changeSelectedPlatform" :options="platforms" optionLabel="name" placeholder="Select a Platform" class="w-full md:w-14rem">

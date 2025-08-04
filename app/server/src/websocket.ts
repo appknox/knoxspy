@@ -5,7 +5,7 @@ import { FridaManager } from "./fridamanager";
 import Channels from "./channels";
 import { Session } from "frida";
 import REPLManager from "./repl";
-import { DeviceDetails, SessionInfo, App } from "./types";
+import { DeviceDetails, SessionInfo, App, AndroidUsersInfo } from "./types";
 
 /**
  * WebSocket message action types
@@ -47,6 +47,8 @@ enum WebSocketAction {
 	REPEATER_TAB_DELETED = "repeaterTabDeleted",
 	DELETE_LIBRARY = "deleteLibrary",
 	LIBRARY_DELETED = "libraryDeleted",
+	GET_ALL_DEVICE_INFO = "getAllDeviceInfo",
+	DEVICE_INFO = "deviceInfo"
 }
 
 /**
@@ -334,6 +336,9 @@ class WebSocketClient {
 				case WebSocketAction.DELETE_LIBRARY:
 					await this.handleDeleteLibrary(data);
 					break;
+				case WebSocketAction.GET_ALL_DEVICE_INFO:
+					await this.handleGetAllDeviceInfo(data);
+					break;
 				default:
 					this.sendJsonError(["Unknown action: " + data.action]);
 			}
@@ -348,6 +353,18 @@ class WebSocketClient {
 				}`
 			);
 		}
+	}
+
+	private async handleGetAllDeviceInfo(data: any): Promise<void> {
+		console.log("Getting all device info for", data.deviceId);
+		const t_users = await fridaManager.getDeviceUsers(data.deviceId);
+		let t_apps: any = {};
+		t_apps = await fridaManager.getAndroidUsersInfo(data.deviceId);
+		this.send({
+			action: WebSocketAction.DEVICE_INFO,
+			users: t_users,
+			apps: t_apps,
+		});
 	}
 
 	private async handleDeleteLibrary(data: any): Promise<void> {
@@ -521,14 +538,19 @@ class WebSocketClient {
 		}
 
 		const [apps, error] = await fridaManager.getApplications(deviceId);
-
 		if (error) {
 			return this.sendError(error);
+		}
+
+		let otherUserApps: AndroidUsersInfo[] = [];
+		if(data.platform.toLowerCase() === "android") {
+			otherUserApps = await fridaManager.getAndroidUsersInfo(deviceId);
 		}
 
 		this.send({
 			action: WebSocketAction.APPS,
 			apps,
+			usersInfo: otherUserApps,
 		});
 	}
 
@@ -651,7 +673,7 @@ class WebSocketClient {
 		data: any,
 		availableDevices: DeviceDetails[]
 	): Promise<void> {
-		const requiredParams = ["appId", "appName", "library", "deviceId"];
+		const requiredParams = ["appId", "appName", "library", "deviceId", "user"];
 		const missingParams = this.checkMissingParams(data, requiredParams);
 
 		if (missingParams.length > 0) {
@@ -668,11 +690,11 @@ class WebSocketClient {
 		}
 
 		console.log("Starting app:", data);
-		const { appId, appName, device, library, platform } = data;
+		const { appId, appName, device, library, platform, user } = data;
 
 		// Launch the app
 		try {
-			const result = await fridaManager.launchApp(deviceId, appId);
+			const result = await fridaManager.launchApp(deviceId, appId, user);
 
 			if (!result.status) {
 				return this.sendError(result.error || "Failed to launch app");

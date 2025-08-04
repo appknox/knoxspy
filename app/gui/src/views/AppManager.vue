@@ -29,7 +29,10 @@
                             </template>
                         </Dropdown>
                         <Button icon="pi pi-refresh" rounded aria-label="Filter" label="Refresh" @click="refreshDevices" outlined />
-
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;" v-if="currentSession.app.selectedDevice? currentSession.app.selectedDevice.platform === 'Android' ? true : false : false">
+                        <p><b>Choose Profile</b></p>
+                        <SelectButton v-model="androidSelectedUser" :options="currentSession.app.users" option-label="name" aria-labelledby="basic" :allow-empty="false" @change="setSelectedUser($event)"/>
                     </div>
                     <div style="display: flex; gap: 10px; position: relative;">
                         <div class="section-header-search">
@@ -48,17 +51,17 @@
                     <i class="pi pi-sync pi-spin" style="font-size: 40px; color: var(--surface-500);"></i>
                     <p style="font: 25px 'Fira Code'; color: var(--surface-500)">Loading Apps</p>
                 </div>
-                <ul class="app-list" v-if="currentSession.app.apps.length > 0" style="padding-bottom: 100px;">
+                <ul class="app-list" v-if="apps.length > 0" style="padding-bottom: 100px;">
                     <ContextMenu ref="menu" :model="appMenu" />
-                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.id, item.name)" @contextmenu="onRightClick($event, item)">
-                        <img :src="item.icon">
+                    <li v-for="item in apps" :key="item.id" @click="startApp(item.id, item.name)" @contextmenu="onRightClick($event, item)">
+                        <img :src="item.icon == '' ? defaultPng : item.icon">
                         <p>{{ item.name }}</p>
                     </li>
                 </ul>
             </div>
         </div>
 	</div>
-    <Header @deviceUpdated="updateDeviceInfo" @appListUpdated="updateAppList"></Header>
+    <Footer @deviceUpdated="updateDeviceInfo" @appListUpdated="updateAppList" @workAppListUpdated="updateWorkAppList"></Footer>
 </template>
 
 <script lang="ts">
@@ -74,7 +77,9 @@ import Toast from 'primevue/toast';
 import Button from "primevue/button";
 import ContextMenu from "primevue/contextmenu";
 import {useAppStore, useWebSocketStore, usePageReadyEmitter} from '../stores/session';
-import Header from "../components/Footer.vue";
+import Footer from "../components/Footer.vue";
+import SelectButton from 'primevue/selectbutton';
+import {defaultPng} from "../constants";
 
 
 export default defineComponent({
@@ -90,10 +95,13 @@ export default defineComponent({
         AutoComplete,
         Toast,
         Button,
-        Header,
+        Footer,
+        SelectButton
     },
     data() {
         return {
+            defaultPng: defaultPng,
+            androidSelectedUser: {name: "User", id: "0"},
             appMenu: [
                 {
                     label: 'Spawn',
@@ -112,7 +120,8 @@ export default defineComponent({
             currentSession: useAppStore(),
             ws: useWebSocketStore(),
             isLoading: true,
-            emitter: usePageReadyEmitter()
+            emitter: usePageReadyEmitter(),
+            apps: [],
         }
     },
     computed: {
@@ -122,20 +131,41 @@ export default defineComponent({
             
             if(query && query.trim() !== "") {
                 query = query.toLowerCase();
-                return this.currentSession.app.apps.filter((app: any) => app.name.toLowerCase().includes(query))
+                return this.apps.filter((app: any) => app.name.toLowerCase().includes(query))
                                 .sort((a: any, b: any) => a.name.localeCompare(b.name));
             } else {
-                return this.currentSession.app.apps;
+                return this.apps;
             }
         },
     },
     mounted() {
+        if(!this.currentSession.app.selectedSession) {
+            this.$router.push('/');
+        }
         console.log("AppManager: Page mounted. Apps length:", this.currentSession.app.apps.length);
         if(this.currentSession.app.apps.length > 0) {
             this.isLoading = false
         }
     },
     methods: {
+        setSelectedUser(user: any) {
+            const t_user = user.value;
+            console.log("AppManager(setSelectedUser): Selected user:", t_user);
+            this.$router.replace({query: {
+                ...this.$route.query,
+                user: t_user.id
+            }})
+            if(parseInt(t_user.id) >= 10) {
+                this.apps = t_user.apps;
+                console.log("AppManager(setSelectedUser): Selected extra user apps:", t_user.apps);
+            } else {
+                console.log("AppManager(setSelectedUser): Selected default user apps:", this.currentSession.app.apps);
+                this.apps = this.currentSession.app.apps
+            }
+        },
+        updateWorkAppList(work_apps: any) {
+            console.log("AppManager(updateWorkAppList): Work apps received:", work_apps.length);
+        },
         refreshDevices() {
             this.ws.send(JSON.stringify({"action":"devices"}))
         },
@@ -156,7 +186,7 @@ export default defineComponent({
         },
         async fetchApps() {
             this.isLoading = true
-            this.ws.send(JSON.stringify({"action":"apps", "deviceId": this.currentSession.app.selectedDevice.id}))
+            this.ws.send(JSON.stringify({"action":"apps", "deviceId": this.currentSession.app.selectedDevice.id, "platform": this.currentSession.app.selectedDevice.platform}))
         },
         async startApp(identifier: string, name: string) {
             this.currentSession.setSelectedApp(identifier)
@@ -166,6 +196,7 @@ export default defineComponent({
                 ...this.$route.query,
                 app: identifier,
                 device: this.currentSession.app.selectedDevice.id,
+                user: this.androidSelectedUser.id,
                 action: "spawn"
             }})
         },
@@ -177,6 +208,7 @@ export default defineComponent({
         },
         updateAppList(app_list: any) {
             console.log("app_list", app_list)
+            this.apps = app_list
             this.isLoading = false
         }
     },
@@ -385,6 +417,7 @@ export default defineComponent({
     overflow-y: scroll;
     overflow-x: hidden;
     display: grid;
+    align-items: start;
     padding: 20px;
     row-gap: 20px;
     margin-top: 20px;
@@ -433,6 +466,7 @@ export default defineComponent({
 }
 .section-apps li p {
     transition: all linear .2s;
+    word-wrap: break-word;
 }
 .section-apps li:hover p {
     margin-top: 11px;

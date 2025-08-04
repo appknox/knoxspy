@@ -12,6 +12,7 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "@devicefarmer/adbkit": "^3.3.8",
         "@koa/cors": "^5.0.0",
         "@mdi/font": "^7.4.47",
         "@types/frida-gum": "^19.0.1",

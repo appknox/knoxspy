@@ -37,3 +37,9 @@ export interface SessionInfo {
   app: App | null;
   status: boolean;
 }
+
+export interface AndroidUsersInfo {
+  id: string;
+  name: string;
+  apps: AppsDetails[];
+}
