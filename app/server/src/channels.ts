@@ -27,6 +27,8 @@ export default class Channels {
 	private appId: string;
 	private library: string;
 	private deviceId: string;
+	private platform: string;
+	private user: string;
 	private ws: WebSocketManager;
 	private processId: number;
 	private connected: boolean = false;
@@ -41,6 +43,8 @@ export default class Channels {
 	 * @param appId Application ID
 	 * @param library Library to use
 	 * @param deviceId Device ID
+	 * @param platform Platform
+	 * @param user User
 	 * @param ws WebSocket manager
 	 * @param processId Process ID (optional)
 	 * @param sessionCallback Callback function for session events
@@ -51,6 +55,8 @@ export default class Channels {
 		appId: string,
 		library: string,
 		deviceId: string,
+		platform: string,
+		user: string,
 		ws: WebSocketManager,
 		processId: number = -1,
 		sessionCallback: (sessionInfo: SessionInfo) => void
@@ -60,6 +66,8 @@ export default class Channels {
 		this.appId = appId;
 		this.library = library;
 		this.deviceId = deviceId;
+		this.platform = platform;
+		this.user = user;
 		this.ws = ws;
 		this.processId = processId;
 		this.deviceManager = frida.getDeviceManager();
@@ -187,8 +195,9 @@ export default class Channels {
 				name: this.name,
 				identifier: this.appId,
 				library: this.library,
-				platform: "",
-				deviceId: this.deviceId
+				platform: this.platform,
+				deviceId: this.deviceId,
+				user: this.user
 			};
 			this.sessionCallback({ session: this.session, app: t_app, status: true });
 		}

@@ -294,14 +294,13 @@ export default defineComponent({
 					id: '0',
 					name: "User"
 				}
+				this.currentSession.app.selectedUser = t_default_user;
+				console.log("Footer(wsMessage): Default user set:", t_default_user);
 				t_users = [t_default_user, ...t_users];
 				this.currentSession.app.users = [...t_users];
-				this.currentSession.app.extraApps = t_users.map(user => {
-					return {
-						id: user.id,
-						name: user.name
-					}
-				});
+				this.currentSession.app.extraApps = message.usersInfo;
+				console.log("Footer(wsMessage): Extra apps received:", message.usersInfo);
+				
 				this.$emit("appListUpdated", this.currentSession.app.apps);
 				this.$emit("workAppListUpdated", this.currentSession.app.extraApps);
 				console.log("Footer(wsMessage): Apps received:", message.apps.length);

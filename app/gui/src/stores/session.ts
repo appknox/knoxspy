@@ -24,6 +24,7 @@ export const useAppStore = defineStore('current_session', {
             isSessionActive: false,
             isDeviceReady: false,
             wsConnected: false,
+            selectedUser: null,
             selectedApp: null,
             selectedDevice: null,
             selectedLibrary: null,
@@ -124,18 +125,32 @@ export const useAppStore = defineStore('current_session', {
         setApps(apps: any) {
             this.app.apps = apps
         },
-        setSelectedApp(app: any, custom: boolean = false, workApp: boolean = false) {
-            console.log("App selected:", app, custom)
+        setSelectedApp(app: any, custom: boolean = false, extraApp: boolean = false) {
+            console.log("SessionStore(setSelectedApp): App selected:", app, custom)
             if(custom) {
                 this.app.selectedApp = app
             } else {
-                if(workApp) {
-                    this.app.selectedApp = this.app.workApps.find((a: any) => a.id === app)
+                if(extraApp) {
+                    console.log("SessionStore(setSelectedApp): Current User:", this.app.selectedUser);
+                    this.app.selectedApp = this.app.extraApps.find((user: any) => {
+                        return user.apps.find((a: any) => a.id === app)
+                    })
+                    console.log("SessionStore(setSelectedApp): Selected App:", this.app.selectedApp);
                 } else {
                     this.app.selectedApp = this.app.apps.find((a: any) => a.id === app)
                 }
             }
-            console.log(this.app.selectedApp)
+            console.log("SessionStore(setSelectedApp): Apps:", this.app.apps);
+            console.log("SessionStore(setSelectedApp): Extra Apps:", this.app.extraApps);
+            console.log("SessionStore(setSelectedApp): Selected App:", this.app.selectedApp);
+        },
+        setSelectedUser(user: any, custom: boolean = false) {
+            if(custom) {
+                this.app.selectedUser = user
+            } else {
+                this.app.selectedUser = this.app.users.find((u: any) => u.id === user)
+            }
+            console.log("SessionStore(setSelectedUser): Selected User:", this.app.selectedUser);
         },
         setSelectedLibrary(library: any) {
             console.log("changing library",  library, this.app.libraries.find((l: any) => l.file === library))
@@ -311,37 +326,37 @@ export const usePageReadyEmitter = defineStore("emitter", () => {
 // ────────────────────────────────────────────────────────────────
 // Dev helper: log every mutation and action of the session store
 // ────────────────────────────────────────────────────────────────
-if (import.meta.env.DEV) {
-  // Delay to make sure Pinia is fully initialised
-  setTimeout(() => {
-    const store = useAppStore();
+// if (import.meta.env.DEV) {
+//   // Delay to make sure Pinia is fully initialised
+//   setTimeout(() => {
+//     const store = useAppStore();
 
-    // 1️⃣  log every state change
-    store.$subscribe((mutation) => {
-      const events = mutation.events
-        ? (Array.isArray(mutation.events) ? mutation.events : [mutation.events])
-        : [];
+//     // 1️⃣  log every state change
+//     store.$subscribe((mutation) => {
+//       const events = mutation.events
+//         ? (Array.isArray(mutation.events) ? mutation.events : [mutation.events])
+//         : [];
 
-      events.forEach((e: any) =>
-        console.log(
-          `[SessionStore] %c${e.key}`,
-          'color:#03A9F4',
-          e.oldValue,
-          '→',
-          e.newValue,
-        )
-      );
-    });
+//       events.forEach((e: any) =>
+//         console.log(
+//           `[SessionStore] %c${e.key}`,
+//           'color:#03A9F4',
+//           e.oldValue,
+//           '→',
+//           e.newValue,
+//         )
+//       );
+//     });
 
-    // 2️⃣  log every action call / result
-    store.$onAction(({ name, args, after, onError }) => {
-      console.log(`[SessionStore] Action «${name}» called with`, args);
-      after((result) =>
-        console.log(`[SessionStore] Action «${name}» resolved`, (result ? result : "No result")),
-      );
-      onError((err) =>
-        console.error(`[SessionStore] Action «${name}» errored`, err),
-      );
-    });
-  }, 0);
-}
+//     // 2️⃣  log every action call / result
+//     store.$onAction(({ name, args, after, onError }) => {
+//       console.log(`[SessionStore] Action «${name}» called with`, args);
+//       after((result) =>
+//         console.log(`[SessionStore] Action «${name}» resolved`, (result ? result : "No result")),
+//       );
+//       onError((err) =>
+//         console.error(`[SessionStore] Action «${name}» errored`, err),
+//       );
+//     });
+//   }, 0);
+// }

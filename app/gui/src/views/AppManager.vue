@@ -145,12 +145,14 @@ export default defineComponent({
         console.log("AppManager: Page mounted. Apps length:", this.currentSession.app.apps.length);
         if(this.currentSession.app.apps.length > 0) {
             this.isLoading = false
+            this.apps = this.currentSession.app.apps
         }
     },
     methods: {
         setSelectedUser(user: any) {
             const t_user = user.value;
             console.log("AppManager(setSelectedUser): Selected user:", t_user);
+            this.currentSession.app.selectedUser = t_user;
             this.$router.replace({query: {
                 ...this.$route.query,
                 user: t_user.id
@@ -196,7 +198,8 @@ export default defineComponent({
                 ...this.$route.query,
                 app: identifier,
                 device: this.currentSession.app.selectedDevice.id,
-                user: this.androidSelectedUser.id,
+                user: this.currentSession.app.selectedDevice.platform.toLowerCase() == "android" ? this.androidSelectedUser.id : -1,
+                platform: this.currentSession.app.selectedDevice.platform,
                 action: "spawn"
             }})
         },

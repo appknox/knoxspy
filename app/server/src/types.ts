@@ -30,6 +30,7 @@ export interface App {
   platform: string;
   library: string;
   deviceId: string;
+  user: string;
 }
 
 export interface SessionInfo {

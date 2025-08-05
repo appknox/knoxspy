@@ -48,7 +48,9 @@ enum WebSocketAction {
 	DELETE_LIBRARY = "deleteLibrary",
 	LIBRARY_DELETED = "libraryDeleted",
 	GET_ALL_DEVICE_INFO = "getAllDeviceInfo",
-	DEVICE_INFO = "deviceInfo"
+	DEVICE_INFO = "deviceInfo",
+	DISCONNECT_APP = "disconnectApp",
+	APP_DISCONNECTED = "appDisconnected"
 }
 
 /**
@@ -339,6 +341,9 @@ class WebSocketClient {
 				case WebSocketAction.GET_ALL_DEVICE_INFO:
 					await this.handleGetAllDeviceInfo(data);
 					break;
+				case WebSocketAction.DISCONNECT_APP:
+					await this.handleDisconnectApp(data);
+					break;
 				default:
 					this.sendJsonError(["Unknown action: " + data.action]);
 			}
@@ -353,6 +358,16 @@ class WebSocketClient {
 				}`
 			);
 		}
+	}
+
+	private async handleDisconnectApp(data: any): Promise<void> {
+		console.log("Disconnecting app", data);
+		activeSession = { session: null, app: null, status: false };
+		await fridaManager.saveActiveSession(null);
+		this.send({
+			action: WebSocketAction.APP_DISCONNECTED,
+			status: true,
+		});
 	}
 
 	private async handleGetAllDeviceInfo(data: any): Promise<void> {
@@ -613,7 +628,7 @@ class WebSocketClient {
 			return this.sendError("No such device found!");
 		}
 
-		const { appId, appName, sessionId, library } = data;
+		const { appId, appName, sessionId, library, platform, user } = data;
 
 		// Find the process by name
 		const processes = await fridaManager.findProcesses(deviceId, appName);
@@ -642,6 +657,8 @@ class WebSocketClient {
 				appId,
 				library,
 				deviceId,
+				platform,
+				user,
 				this.manager,
 				processId,
 				this.sessionEventCallback
@@ -707,6 +724,7 @@ class WebSocketClient {
 				platform: platform,
 				deviceId: deviceId,
 				name: appName,
+				user: user,
 				library: library,
 			};
 
@@ -714,7 +732,7 @@ class WebSocketClient {
 			activeSession = { session: session, app: t_app, status: true };
 			console.log("New Session:", activeSession);
 			await fridaManager.saveActiveSession(session);
-			console.log(activeSession);
+			// console.log(activeSession);
 			
 
 			// Create a channel to monitor the app
@@ -724,6 +742,8 @@ class WebSocketClient {
 				appId,
 				library,
 				deviceId,
+				platform,
+				user,
 				this.manager,
 				-1,
 				this.sessionEventCallback
