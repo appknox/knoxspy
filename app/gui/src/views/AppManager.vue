@@ -7,7 +7,7 @@
                 <div class="section-header">
                     <div class="section-header-device">
                         <h4>Apps For</h4>
-                        <Dropdown v-model="currentSession.app.selectedDevice" :options="currentSession.app.devices" optionLabel="name" @change="fetchApps" class="w-full md:w-14rem" :placeholder="currentSession.app.selectedDevice?.value || 'Select a Device'">
+                        <Dropdown v-model="cs.getSelection.device" :options="cs.getData.devices" optionLabel="name" @change="switchDevice" class="w-full md:w-14rem" :placeholder="cs.getSelection.device?.value || 'Select a Device'">
                             <template #value="slotProps">
                                 <div v-if="slotProps.value" class="flex align-items-center">
                                     <div v-if="slotProps.value.platform === 'iOS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.value.name }}</div>
@@ -28,19 +28,23 @@
                                 </div>
                             </template>
                         </Dropdown>
-                        <Button icon="pi pi-refresh" rounded aria-label="Filter" label="Refresh" @click="refreshDevices" outlined />
-
+                        <Button icon="pi pi-refresh" rounded aria-label="Filter" :loading="refreshingDevices" label="Refresh Devices" @click="refreshDevices" outlined />
+                    </div>
+                    <div v-if="cs.getData.users && cs.getData.users.length" style="display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;" >
+                        <b>Choose User:</b>
+                        <SelectButton v-model="cs.getSelection.user" :options="cs.getData.users" optionLabel="name" aria-labelledby="basic" @change="switchUser" />
                     </div>
                     <div style="display: flex; gap: 10px; position: relative;">
+                        <Button icon="pi pi-refresh" :loading="refreshingApps" rounded aria-label="Filter" label="Refresh Apps" @click="refreshApps" outlined />
                         <div class="section-header-search">
                             <IconField iconPosition="left">
                                 <InputIcon class="pi pi-search"></InputIcon>
-                                <InputText v-model="appSearch" placeholder="Search Apps" :onKeydown="searchApp" />
+                                <InputText v-model="appSearch" placeholder="Search Apps" />
                             </IconField>
                         </div>
                     </div>
                 </div>
-                <div v-if="currentSession.app.selectedDevice == null" style="display: flex; width: 100%; height: calc(100vh - 65px); justify-content: center; align-items: center; flex-direction: column;">
+                <div v-if="cs.getSelection.device == null" style="display: flex; width: 100%; height: calc(100vh - 65px); justify-content: center; align-items: center; flex-direction: column;">
                     <i style="font-size: 40px; color: var(--surface-500);" class="pi pi-info-circle"></i>
                     <p style="font: 25px 'Fira Code'; color: var(--surface-500)">No Device Selected!</p>
                 </div>
@@ -48,17 +52,17 @@
                     <i class="pi pi-sync pi-spin" style="font-size: 40px; color: var(--surface-500);"></i>
                     <p style="font: 25px 'Fira Code'; color: var(--surface-500)">Loading Apps</p>
                 </div>
-                <ul class="app-list" v-if="currentSession.app.apps.length > 0" style="padding-bottom: 100px;">
+                <ul class="app-list" v-if="cs.getSelection.apps && cs.getSelection.apps.length > 0" style="padding-bottom: 100px;">
                     <ContextMenu ref="menu" :model="appMenu" />
-                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.id, item.name)" @contextmenu="onRightClick($event, item)">
-                        <img :src="item.icon">
+                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.id)" @contextmenu="onRightClick($event, item)">
+                        <img :src="item.icon || defaultPng">
                         <p>{{ item.name }}</p>
                     </li>
                 </ul>
             </div>
         </div>
 	</div>
-    <Header @deviceUpdated="updateDeviceInfo" @appListUpdated="updateAppList"></Header>
+    <Footer @dashboardReady="dashboardReady"></Footer>
 </template>
 
 <script lang="ts">
@@ -73,9 +77,11 @@ import AutoComplete from "primevue/autocomplete";
 import Toast from 'primevue/toast';
 import Button from "primevue/button";
 import ContextMenu from "primevue/contextmenu";
-import {useAppStore, useWebSocketStore, usePageReadyEmitter} from '../stores/session';
-import Header from "../components/Footer.vue";
-
+import {useAppStore, useWebSocketStore} from '../stores/session';
+import defaultPng from '../../public/default.png';
+import Footer from "../components/Footer.vue";
+import SelectButton from 'primevue/selectbutton';
+import ConfirmDialog from 'primevue/confirmdialog';
 
 export default defineComponent({
 	name: 'AppManager',
@@ -90,10 +96,13 @@ export default defineComponent({
         AutoComplete,
         Toast,
         Button,
-        Header,
+        Footer,
+        SelectButton,
+        ConfirmDialog,
     },
     data() {
         return {
+            defaultPng,
             appMenu: [
                 {
                     label: 'Spawn',
@@ -109,43 +118,72 @@ export default defineComponent({
             appSearch: "",
             rightClickMenuIdentifier: "",
             rightClickMenuApp: "",
-            currentSession: useAppStore(),
+            cs: useAppStore(),
             ws: useWebSocketStore(),
             isLoading: true,
-            emitter: usePageReadyEmitter()
+            refreshingApps: false,
+            refreshingDevices: false,
         }
     },
     computed: {
         sortedApps(): any {
             var query = this.appSearch;
-            // console.log(query);
-            
             if(query && query.trim() !== "") {
                 query = query.toLowerCase();
-                return this.currentSession.app.apps.filter((app: any) => app.name.toLowerCase().includes(query))
+                return this.cs.getSelection.apps.filter((app: any) => app.name.toLowerCase().includes(query))
                                 .sort((a: any, b: any) => a.name.localeCompare(b.name));
             } else {
-                return this.currentSession.app.apps;
+                return this.cs.getSelection.apps;
             }
         },
     },
     mounted() {
-        console.log("AppManager: Page mounted. Apps length:", this.currentSession.app.apps.length);
-        if(this.currentSession.app.apps.length > 0) {
-            this.isLoading = false
+        console.log("AppManager(mounted): Page mounted");
+        if(this.ws.isConnected) {
+            console.log("AppManager(mounted): WebSocket connected");
+            this.isLoading = false;
         }
+        this.ws.addOnMessageHandler(this.wsMessage);
     },
     methods: {
+        wsMessage(message: any) {
+            message = JSON.parse(message);
+            console.log("AppManager(wsMessage): Received message:", message.action);
+            if(message.action === "apps.refresh.ack") {
+                console.log("Footer(wsMessage): Apps ready", message.data);
+				if(message.platform.toLowerCase() === "android") {
+					this.cs.setDataKey("users", message.data);
+					this.cs.setSelectionKey("user", message.data.filter(user => user.id == "0")[0]);
+					this.cs.setSelectionKey("apps", message.data.filter(user => user.id == "0")[0].apps);
+				} else {
+					this.cs.setDataKey("apps", message.data[0]);
+					this.cs.setDataKey("users", []);
+				}
+                this.refreshingApps = false;
+            } else if(message.action === "devices.refresh.ack") {
+				console.log("Footer(wsMessage): Devices ready", message.data);
+				this.cs.setDataKey("devices", message.data);
+                this.refreshingDevices = false;
+            }
+        },
+        dashboardReady() {
+            this.isLoading = false
+        },
         refreshDevices() {
-            this.ws.send(JSON.stringify({"action":"devices"}))
+            this.refreshingDevices = true;
+            this.ws.send(JSON.stringify({"action":"devices.refresh"}));
+        },
+        refreshApps() {
+            this.refreshingApps = true;
+            this.ws.send(JSON.stringify({"action":"apps.refresh", "device": this.cs.getSelection.device.id, "platform": this.cs.getSelection.device.platform}))
         },
         rightClickHandler(type: string) {
-            this.currentSession.setSelectedApp(this.rightClickMenuIdentifier)
-            this.currentSession.storeSelectedApp()
             this.$router.push({path: '/app', query: {
                 ...this.$route.query,
                 app: this.rightClickMenuIdentifier,
-                device: this.currentSession.app.selectedDevice.id,
+                device: this.cs.getSelection.device.id,
+                platform: this.cs.getSelection.device.platform,
+                user: this.cs.getSelection.user.id || -1,
                 action: type
             }})
         },
@@ -154,31 +192,41 @@ export default defineComponent({
             this.rightClickMenuApp = item.name
             this.$refs.menu.show(event);
         },
-        async fetchApps() {
-            this.isLoading = true
-            this.ws.send(JSON.stringify({"action":"apps", "deviceId": this.currentSession.app.selectedDevice.id}))
+        switchDevice() {
+            const t_device = this.cs.getSelection.device;
+            console.log("AppManager(switchDevice): Selected device:", t_device);
+            if(t_device.platform.toLowerCase() === "android") {
+                this.cs.setSelectionKey("apps", t_device.users.filter((user: any) => user.id == "0")[0].apps);
+                this.cs.setSelectionKey("user", t_device.users.filter((user: any) => user.id == "0")[0]);
+                this.cs.setDataKey("users", t_device.users);
+                console.log("AppManager(switchDevice): Users:", this.cs.getData.users);
+            } else {
+                this.cs.setSelectionKey("apps", t_device.users[0]);
+                this.cs.setDataKey("users", []);
+                this.cs.setSelectionKey("user", {});
+            }
         },
-        async startApp(identifier: string, name: string) {
-            this.currentSession.setSelectedApp(identifier)
-            console.log("AppManager(startApp): Selected app:", this.currentSession.app.selectedApp);
-            console.log("AppManager(startApp): Selected device:", this.currentSession.app.selectedDevice);
+        switchUser(user: any) {
+            console.log("AppManager(switchUser): Selected user:", user.value);
+            const t_apps = this.cs.getData.users.find((u: any) => u.id == parseInt(user.value.id)).apps;
+            console.log("AppManager(switchUser): Apps:", t_apps);
+            this.cs.setSelectionKey("apps", t_apps);
+        },
+        async startApp(identifier: string) {
+            const t_apps = this.cs.getSelection.apps;
+            const t_app = t_apps.find((app: any) => app.id == identifier);
+            this.cs.setSelectionKey("app", t_app)
+            console.log("AppManager(startApp): Selected app:", this.cs.getSelection.app);
+            console.log("AppManager(startApp): Selected device:", this.cs.getSelection.device);
             this.$router.push({path: '/app', query: {
                 ...this.$route.query,
-                app: identifier,
-                device: this.currentSession.app.selectedDevice.id,
+                app: t_app.id,
+                platform: this.cs.getSelection.device.platform,
+                user: this.cs.getSelection.user.id || -1,
+                device: this.cs.getSelection.device.id,
                 action: "spawn"
             }})
         },
-        searchApp(event: any) {
-            console.log("Search app", event.target.value);
-        },
-        updateDeviceInfo() {
-            // this.fetchApps();
-        },
-        updateAppList(app_list: any) {
-            console.log("app_list", app_list)
-            this.isLoading = false
-        }
     },
 });
 </script>
@@ -465,6 +513,7 @@ break {
 }
 .app-list {
     margin-bottom: 50px;
+    align-items: start;
 }
 .app-list::after {
     content: '';

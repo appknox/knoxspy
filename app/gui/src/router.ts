@@ -1,13 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import DashboardPage from './views/DashboardPage.vue'
+import Sessions from './views/Sessions.vue'
 import HTTPTraffic from './views/HTTPTraffic.vue'
 import LibraryManager from './views/LibraryManager.vue'
 import AppManager from './views/AppManager.vue'
 import AppSelector from './views/AppSelector.vue'
 
 const routes = [
-  { path: '/', component: DashboardPage, name: 'Dashboard'},
+  { path: '/', component: Sessions, name: 'Sessions'},
   { path: '/traffic', beforeEnter: (to, from, next) => {
     if (Object.keys(from.query).length && Object.keys(to.query).length === 0) {
       next({ path: to.path, query: from.query });

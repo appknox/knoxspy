@@ -10,11 +10,15 @@ interface ChannelMessage {
 	action: string;
 	message: string;
 	appName: string;
+	sessionId?: string;
 	appId: string;
 	library: string;
 	deviceId: string;
+	platform: string;
+	user: string;
 	processId?: number;
 	error?: string;
+	extra?: string;
 }
 
 /**
@@ -24,9 +28,12 @@ export default class Channels {
 	private session: Session;
 	private changedSignal!: frida.DevicesChangedHandler;
 	private name: string;
+	private sessionId: string;
 	private appId: string;
 	private library: string;
 	private deviceId: string;
+	private platform: string;
+	private user: string;
 	private ws: WebSocketManager;
 	private processId: number;
 	private connected: boolean = false;
@@ -41,6 +48,8 @@ export default class Channels {
 	 * @param appId Application ID
 	 * @param library Library to use
 	 * @param deviceId Device ID
+	 * @param platform Platform
+	 * @param user User
 	 * @param ws WebSocket manager
 	 * @param processId Process ID (optional)
 	 * @param sessionCallback Callback function for session events
@@ -51,15 +60,21 @@ export default class Channels {
 		appId: string,
 		library: string,
 		deviceId: string,
+		platform: string,
+		user: string,
 		ws: WebSocketManager,
 		processId: number = -1,
-		sessionCallback: (sessionInfo: SessionInfo) => void
+		sessionCallback: (sessionInfo: SessionInfo) => void,
+		sessionId: string = '',
 	) {
 		this.session = session;
 		this.name = name;
+		this.sessionId = sessionId;
 		this.appId = appId;
 		this.library = library;
 		this.deviceId = deviceId;
+		this.platform = platform;
+		this.user = user;
 		this.ws = ws;
 		this.processId = processId;
 		this.deviceManager = frida.getDeviceManager();
@@ -75,8 +90,8 @@ export default class Channels {
 		try {
 			console.log("Device state changed");
 			this.broadcastMessage({
-				action: 'deviceStateChanged',
-				message: 'Device state changed'
+				action: 'device.update',
+				message: 'Changed'
 			});
 		} catch (error) {
 			console.error("Error handling device change:", error);
@@ -121,8 +136,10 @@ export default class Channels {
 			
 			// Notify that the channel is connected
 			this.broadcastMessage({
-				action: 'deviceUpdate',
-				message: 'Connected'
+				action: 'device.update',
+				message: 'Connected',
+				sessionId: this.sessionId,
+				extra: 'Connected to ' + this.name
 			});
 
 			// Monitor session detachment
@@ -131,12 +148,15 @@ export default class Channels {
 				
 				// Send detailed information about the detachment
 				const detachMessage: ChannelMessage = {
-					action: 'deviceUpdate',
+					action: 'device.update',
 					message: 'Disconnected',
 					appName: this.name,
 					appId: this.appId,
 					library: this.library,
 					deviceId: this.deviceId,
+					platform: this.platform,
+					user: this.user,
+					sessionId: this.sessionId
 				};
 				
 				// Include crash information if available
@@ -147,7 +167,7 @@ export default class Channels {
 				
 				this.ws.broadcastData(JSON.stringify(detachMessage));
 
-				this.sessionCallback({ session: null, app: null, status: false });
+				this.sessionCallback({ session: null, app: null, status: false, channel: null });
 				
 				// Clean up the connection
 				this.disconnect();
@@ -173,24 +193,28 @@ export default class Channels {
 			appId: this.appId,
 			library: this.library,
 			deviceId: this.deviceId,
-			action: baseMessage.action || 'deviceUpdate',
-			message: baseMessage.message || ''
+			platform: this.platform,
+			user: this.user,
+			action: baseMessage.action || 'device.update',
+			message: baseMessage.message || '',
+			extra: baseMessage.extra || ''
 		};
 		
 		if (this.processId > 0) {
 			message.processId = this.processId;
 		}
 		if(baseMessage.message === 'Disconnected') {
-			this.sessionCallback({ session: null, app: null, status: false });
+			this.sessionCallback({ session: null, app: null, status: false, channel: null });
 		} else if (baseMessage.message === 'Connected') {
 			const t_app: App = {
 				name: this.name,
-				identifier: this.appId,
+				id: this.appId,
 				library: this.library,
-				platform: "",
-				deviceId: this.deviceId
+				platform: this.platform,
+				deviceId: this.deviceId,
+				user: this.user
 			};
-			this.sessionCallback({ session: this.session, app: t_app, status: true });
+			this.sessionCallback({ session: this.session, app: t_app, status: true, channel: this });
 		}
 		
 		this.ws.broadcastData(JSON.stringify(message));
