@@ -12,7 +12,7 @@
                 <p class="m-0"> 
           
                     <div class="card flex justify-content-center" style="width: 700px; margin: 0 auto;">
-                        <Listbox v-model="selectedLibrary" :options="libraries" optionLabel="name" class="w-full md:w-14rem" listStyle="minx-height:250px" :focusOnHover="false" style="max-height: 500px; overflow-y: scroll;">
+                        <Listbox v-model="selectedLibrary" :options="libraries" optionLabel="name" class="w-full md:w-14rem" listStyle="minx-height:250px;" :focusOnHover="false" style="max-height: 500px; overflow-y: scroll; scrollbar-width: none; -ms-overflow-style: none;">
                             <template #option="slotProps">
                                 <div class="flex align-items-start flex-column" style="display: flex; gap: 10px; align-items: center">
                                     <div>
@@ -47,7 +47,7 @@
                                     <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
                                         <div class="card">
                                             <FloatLabel style="width: 400px; margin: 30px auto 30px;">
-                                                <InputText id="username" v-model="libraryNameValue" style="width: 350px;" @input="changeSelectedPlatform"/>
+                                                <InputText id="username" v-model="libraryNameValue" style="width: 350px;" @input="changeSelectedPlatform" autocomplete="off"/>
                                                 <label for="username" style="width: 350px;">Library Name</label>
                                             </FloatLabel>
                                             <Dropdown style="width: 350px;" v-model="selectedPlatform" @change="changeSelectedPlatform" :options="platforms" optionLabel="name" placeholder="Select a Platform" class="w-full md:w-14rem">
@@ -170,7 +170,7 @@
                 </div>
             </template>
         </ConfirmPopup>
-        <Footer @dashboardUpdated="dashboardUpdated"></Footer>
+        <Footer @dashboardReady="dashboardReady"></Footer>
 	</div>
 </template>
 
@@ -252,7 +252,7 @@ export default defineComponent({
         this.ws.addOnOpenHandler(this.wsReady);
         this.ws.addOnMessageHandler(this.wsMessage);
         if(this.ws.isConnected) {
-            this.ws.send(JSON.stringify({ action: "libraries" }));
+            this.ws.send(JSON.stringify({ action: "library.list" }));
         }
     },
     methods: {
@@ -267,25 +267,25 @@ export default defineComponent({
                 reject: () => {}
             });
         },
-        dashboardUpdated(isDashboardReady: boolean) {
-            console.log("LibraryManager(dashboardUpdated): Dashboard ready", isDashboardReady);
+        dashboardReady(isDashboardReady: boolean) {
+            console.log("LibraryManager(dashboardReady): Dashboard ready", isDashboardReady);
             if(isDashboardReady) {
-                this.ws.send(JSON.stringify({ action: "libraries" }));
+                this.ws.send(JSON.stringify({ action: "library.list" }));
             }
         },
         wsReady() {
             console.log("LibraryManager(wsReady): WebSocket ready");
-            this.ws.send(JSON.stringify({ action: "libraries" }));
+            this.ws.send(JSON.stringify({ action: "library.list" }));
         },
         wsMessage(event: any) {
             const data = JSON.parse(event);
             console.log("LibraryManager(wsMessage): WebSocket message", data.action);
-            if(data.action == "libraries") {
+            if(data.action == "library.list.ack") {
                 console.log("LibraryManager(wsMessage): Libraries", data);
                 this.libraries = data.libraries;
-            } else if(data.action == "libraryDeleted") {
+            } else if(data.action == "library.delete.ack") {
                 console.log("LibraryManager(wsMessage): Library deleted", data);
-                this.libraries = this.libraries.filter((library: any) => library.id !== data.id);
+                this.libraries = this.libraries.filter((library: any) => library.id !== data.libraryId);
             }
         },
         onStepperIndexChanged(event: any) {
@@ -302,7 +302,7 @@ export default defineComponent({
             this.tabViewActiveIndex = 0
 
 
-            const json = {"action":"libraries"}
+            const json = {"action":"library.list"}
             this.ws.send(JSON.stringify(json))
         },
         changeSelectedPlatform(event: any) {
@@ -400,7 +400,7 @@ export default defineComponent({
         deleteLibrary(library: any) {
             console.log("LibraryManager(deleteLibrary): Delete library", library);
             if(library && library.id) {
-                this.ws.send(JSON.stringify({ action: "deleteLibrary", libraryId: library.id }));
+                this.ws.send(JSON.stringify({ action: "library.delete", libraryId: library.id }));
             }
         }
     },

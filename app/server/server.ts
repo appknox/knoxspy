@@ -83,7 +83,6 @@ async function compileFridaAgent(folderPath: string): Promise<void> {
 // API Routes
 router.get("/connected", async (req: Request, res: Response) => {
 	console.log("Checking active session");
-	
 	const activeSession = wsManager.getActiveSession();
 	return res.status(200).json(activeSession);
 });

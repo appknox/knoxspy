@@ -6,11 +6,25 @@
             <h1 :class="{'active': isSidebarOpen}">KnoxSpy</h1>
         </div>
         <ul>
-            <li><router-link to="/"><i class="pi pi-home" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Dashboard</span></router-link></li>
+            <li><router-link to="/"><i class="pi pi-home" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Sessions</span></router-link></li>
             <li><router-link to="/apps"><i class="pi pi-th-large" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Apps</span></router-link></li>
             <li><router-link to="/traffic"><i class="pi pi-history mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">HTTP Traffic</span></router-link></li>
-            <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Library Manager</span></router-link></li>
+            <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Libraries</span></router-link></li>
         </ul>
+    </div>
+    <div id="splash-screen">
+        <div class="card">
+            <div class="loader">
+                <p style="margin: 0">loading</p>
+                <div class="words">
+                <span class="word">sessions</span>
+                <span class="word">devices</span>
+                <span class="word">users</span>
+                <span class="word">apps</span>
+                <span class="word">libraries</span>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -18,7 +32,7 @@
 import { defineComponent, watch } from "vue";
 import Button from "primevue/button";
 import InlineMessage from 'primevue/inlineMessage';
-import { useAppStore, useWebSocketStore, usePageReadyEmitter } from "../stores/session";
+import { useAppStore, useWebSocketStore } from "../stores/session";
 import OverlayPanel from 'primevue/overlaypanel';
 import Toast from 'primevue/toast';
 import Dropdown from 'primevue/dropdown';
@@ -28,7 +42,7 @@ export default defineComponent({
 	name: 'SideBar',
     data() {
         return {
-            currentSession: useAppStore(),
+            cs: useAppStore(),
             ws: useWebSocketStore(),
             isSidebarOpen: false,
         }
@@ -45,6 +59,12 @@ export default defineComponent({
         this.ws.addOnOpenHandler(this.wsReady)
         this.ws.addOnMessageHandler(this.handleMessage)
         window.addEventListener('beforeunload', this.handleReload)
+
+        watch(() => this.cs.getStatus.dashboardStatus, (newVal, oldVal) => {
+            if (newVal) {
+                document.getElementById('splash-screen')?.classList.add('hidden');
+            }
+        })
     },
     methods: {
         wsReady() {
@@ -54,6 +74,7 @@ export default defineComponent({
             message = JSON.parse(message);
         },
         toggleSidebar() {            
+            this.cs.setStatusKey("sidebarStatus", !this.isSidebarOpen);
             this.isSidebarOpen = !this.isSidebarOpen;
         },
         handleReload(event: any) {
@@ -184,7 +205,7 @@ export default defineComponent({
     transition: all ease-in-out .4s;
     /* position: fixed; */
     position: relative;
-    z-index: 10000;
+    z-index: 1001;
     left: 0;
     top: 0;
     background-color: #212631;
@@ -235,6 +256,7 @@ ul li {
     padding-left: 10px;
     padding-right: 10px;
     margin-bottom: 5px;
+    white-space: nowrap;
 }
 li a {
     border-radius: 7px;
@@ -258,4 +280,115 @@ ul li a.router-link-exact-active {
     box-shadow: 0px 6px 15px -14px #000;
     background-color: #2a303d;
 }
+
+
+
+#splash-screen {
+	position: fixed;
+    left: 0px;
+    top: 0;
+    height: 100%;
+    width: 100%;
+    background-color: #fff;
+    z-index: 11000;
+	display: flex;
+    justify-content: center;
+    align-content: center;
+    flex-wrap: wrap;
+}
+#splash-screen.hidden {
+    display: none;
+}
+
+#splash-screen .card {
+  /* color used to softly clip top and bottom of the .words container */
+  /* --bg-color: #111; */
+  /* background-color: var(--bg-color); */
+  padding: 1rem 2rem;
+  border-radius: 1.25rem;
+  width: 300px;
+  
+}
+#splash-screen .loader {
+  color: rgb(124, 124, 124);
+  font-family: "Poppins", sans-serif;
+  font-weight: 500;
+  font-size: 25px;
+  -webkit-box-sizing: content-box;
+  box-sizing: content-box;
+  height: 40px;
+  padding: 10px 10px;
+  display: -webkit-box;
+  display: -ms-flexbox;
+  display: flex;
+  border-radius: 8px;
+}
+
+#splash-screen .words {
+  overflow: hidden;
+  position: relative;
+}
+#splash-screen .words::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    var(--bg-color) 10%,
+    transparent 30%,
+    transparent 70%,
+    var(--bg-color) 90%
+  );
+  z-index: 20;
+}
+
+#splash-screen .word {
+  display: block;
+  height: 100%;
+  padding-left: 6px;
+  color: var(--primary-color);
+  animation: spin_4991 4s infinite;
+}
+
+@keyframes spin_4991 {
+  10% {
+    -webkit-transform: translateY(-102%);
+    transform: translateY(-102%);
+  }
+
+  25% {
+    -webkit-transform: translateY(-100%);
+    transform: translateY(-100%);
+  }
+
+  35% {
+    -webkit-transform: translateY(-202%);
+    transform: translateY(-202%);
+  }
+
+  50% {
+    -webkit-transform: translateY(-200%);
+    transform: translateY(-200%);
+  }
+
+  60% {
+    -webkit-transform: translateY(-302%);
+    transform: translateY(-302%);
+  }
+
+  75% {
+    -webkit-transform: translateY(-300%);
+    transform: translateY(-300%);
+  }
+
+  85% {
+    -webkit-transform: translateY(-402%);
+    transform: translateY(-402%);
+  }
+
+  100% {
+    -webkit-transform: translateY(-400%);
+    transform: translateY(-400%);
+  }
+}
+
 </style>

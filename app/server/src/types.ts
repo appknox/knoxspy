@@ -25,9 +25,10 @@ export interface LibraryData {
 }
 
 export interface App {
+  id: string;
   name: string;
-  identifier: string;
   platform: string;
+  user: string;
   library: string;
   deviceId: string;
 }
@@ -36,4 +37,31 @@ export interface SessionInfo {
   session: Session | null;
   app: App | null;
   status: boolean;
+  channel: any | null;
+}
+
+export interface User {
+  id: string;
+  name: string;
+}
+
+export interface DeviceInfo {
+  id: string;
+  name: string;
+  type: string;
+  platform: string;
+  users: any[];
+}
+
+export interface DashboardData {
+  sessions: any[];
+  devices: DeviceInfo[];
+  libraries: LibraryData[];
+  activeSession: any;
+}
+
+export interface AndroidUsersInfo {
+  id: string;
+  name: string;
+  apps: AppsDetails[];
 }

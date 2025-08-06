@@ -105,7 +105,7 @@ class REPLManager {
 							this.sendScriptError({ description: tmpJson.error });
 						} else {
 							this.ws.broadcastData(
-								JSON.stringify({ action: "scriptOutput", message: tmpJson })
+								JSON.stringify({ action: "script.output", message: tmpJson })
 							);
 						}
 					} catch (error) {
@@ -166,7 +166,7 @@ class REPLManager {
 						
 						this.ws.broadcastData(
 							JSON.stringify({
-								action: "replayUpdate",
+								action: "repeater.replay.ack",
 								replay: JSON.stringify(tmpJson),
 							})
 						);
@@ -194,12 +194,12 @@ class REPLManager {
 				});
 			}
 			
-			this.ws.broadcastData(
-				JSON.stringify({
-					action: "successOutput",
-					message: `${code} library attached!`,
-				})
-			);
+			// this.ws.broadcastData(
+			// 	JSON.stringify({
+			// 		action: "general.ack",
+			// 		message: `${code} library attached!`,
+			// 	})
+			// );
 		} catch (error) {
 			console.error("Error attaching script:", error);
 			this.sendScriptError(`Failed to attach script ${code}: ${error instanceof Error ? error.message : String(error)}`);
@@ -250,7 +250,7 @@ class REPLManager {
 									this.dbManager.getRowFromDatabase(lastId, (row) => {
 										this.ws.broadcastData(
 											JSON.stringify({
-												action: "trafficUpdate",
+												action: "traffic.update.ack",
 												message: JSON.parse(row),
 											})
 										);
@@ -274,7 +274,14 @@ class REPLManager {
 			
 			this.ws.broadcastData(
 				JSON.stringify({
-					action: "successOutput",
+					action: "general.ack",
+					message: `${code} library attached!`,
+				})
+			);
+			this.ws.broadcastData(
+				JSON.stringify({
+					action: "library.change.ack",
+					library: code,
 					message: `${code} library attached!`,
 				})
 			);

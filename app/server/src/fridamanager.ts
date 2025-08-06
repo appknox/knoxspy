@@ -1,6 +1,9 @@
 import * as frida from "frida";
 import { Scope } from "frida/dist/device";
-import { AppsDetails, DeviceDetails, SessionInfo } from "./types";
+import { AppsDetails, DeviceDetails, SessionInfo, AndroidUsersInfo } from "./types";
+import Adb from "@devicefarmer/adbkit";
+
+const client = Adb.createClient();
 
 /**
  * Represents the result of an operation that may succeed or fail
@@ -43,7 +46,7 @@ export class FridaManager {
 	private deviceManager: frida.DeviceManager;
 	private sessions: Map<string, frida.Session>;
 	private readonly DEFAULT_TIMEOUT = 10000; // 10 seconds
-	private activeSession: SessionInfo = { session: null, app: null, status: false };
+	private activeSession: SessionInfo = { session: null, app: null, status: false, channel: null };
 
 	constructor(activeSession: SessionInfo | null = null) {
 		this.deviceManager = frida.getDeviceManager();
@@ -54,6 +57,96 @@ export class FridaManager {
 	async saveActiveSession(session: frida.Session | null): Promise<void> {
 		this.activeSession.session = session;
 	}
+
+	/**
+	 * Get all users on a device
+	 * @param deviceId The ID of the device
+	 * @returns List of users
+	 */
+	async getDeviceUsers(deviceId: string): Promise<DeviceDetails[]> {
+		try {
+			const device = client.getDevice(deviceId);
+			return device.shell('pm list users | grep -v Users:').then(Adb.util.readAll).then((output: string) => {
+				const users = output
+					.toString()
+					.trim()
+					.split('\n')
+					.map((line: any) => {
+						const match = line.match(/UserInfo\{(\d+):(.+?):\w+\}/);
+						return {
+							id: match?.[1],
+							name: match?.[2],
+						};
+					});
+				return users;
+			});
+		} catch (error) {
+			console.error(`Error getting users for device ${deviceId}:`, error);
+			return [];
+		}
+	}
+
+	/**
+	 * Get all applications for a user on a device
+	 * @param deviceId The ID of the device
+	 * @param userId The ID of the user
+	 * @returns List of applications
+	 */
+	async getDeviceUserApplications(device: any, user: any): Promise<AppsDetails[]> {
+		let t_packages: AppsDetails[] = [];
+		try {
+			const t_fetched_packages = await device.getPackages("--user " + user.id + " -3");
+			for (const pkg of t_fetched_packages) {
+				t_packages.push({
+					icon: "",
+					id: pkg,
+					name: pkg,
+					type: user.id == "0" ? "user" : "work",
+				});
+			}
+		} catch (error) {
+			console.error(`Error getting applications for user ${user.id} on device ${device.id}:`, error);
+		}
+		return t_packages;
+	}
+
+	/**
+	 * Get all users info on an android device
+	 * @param deviceId The ID of the device
+	 * @returns List of users info with their apps
+	 */
+	async getAndroidUsersInfo(deviceId: string): Promise<AndroidUsersInfo[]> {
+		try {
+			const device = client.getDevice(deviceId);
+			const users = await this.getDeviceUsers(deviceId);
+			let androidUsersInfo: AndroidUsersInfo[] = [];
+			for (const user of users) {
+				if( user.id === "0") {
+					continue;
+				}
+				const packages = await this.getDeviceUserApplications(device, user);
+				androidUsersInfo.push({
+					id: user.id,
+					name: user.name,
+					apps: packages,
+				});
+			}
+
+			const t_main_user = users.find((user: any) => user.id === "0");
+			const [t_main_apps, error] = await this.getApplications(deviceId);
+			const t_main_user_obj = {
+				id: t_main_user?.id || "0",
+				name: t_main_user?.name || "android",
+				apps: t_main_apps,
+			}
+			androidUsersInfo = [t_main_user_obj, ...androidUsersInfo];
+			return androidUsersInfo;
+		} catch (error) {
+			console.error(`Error getting applications for device ${deviceId}:`, error);
+			return [];
+		}
+	}
+
 
 	/**
 	 * Find a device by its ID
@@ -145,6 +238,7 @@ export class FridaManager {
 			}
 
 			const processes = await device.enumerateProcesses({ scope: Scope.Full });
+			// console.log("[findProcesses] Processes:", processes);
 
 			if (appName.trim() !== "") {
 				return processes.filter((proc) => proc.name === appName);
@@ -203,11 +297,13 @@ export class FridaManager {
 	 * Launch an application on a device
 	 * @param deviceId The device ID
 	 * @param appId The application ID
+	 * @param user The user ID to launch the app under
 	 * @returns Result with session or error
 	 */
 	async launchApp(
 		deviceId: string,
-		appId: string
+		appId: string,
+		user: string
 	): Promise<OutputResult<frida.Session>> {
 		if (this.activeSession) {
 			console.log("Active session already exists. Will try to attach to app instead!");
@@ -225,7 +321,7 @@ export class FridaManager {
 				throw new Error(`Device with ID ${deviceId} not found`);
 			}
 
-			const pid = await device.spawn(appId);
+			const pid = await device.spawn(appId, { uid: parseInt(user)} );
 			device.resume(pid);
 			const session = await device.attach(pid);
 
@@ -262,8 +358,8 @@ export class FridaManager {
 			const session = await device.attach(processID);
 
 			// Store session for later cleanup
-			const sessionKey = `${deviceId}-pid-${processID}`;
-			this.sessions.set(sessionKey, session);
+			// const sessionKey = `${deviceId}-pid-${processID}`;
+			// this.sessions.set(sessionKey, session);
 
 			return session;
 		} catch (error) {

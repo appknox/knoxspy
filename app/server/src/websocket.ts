@@ -5,48 +5,67 @@ import { FridaManager } from "./fridamanager";
 import Channels from "./channels";
 import { Session } from "frida";
 import REPLManager from "./repl";
-import { DeviceDetails, SessionInfo, App } from "./types";
+import { DeviceDetails, SessionInfo, App, DashboardData, DeviceInfo, AppsDetails } from "./types";
 
 /**
  * WebSocket message action types
  */
 enum WebSocketAction {
-	DEVICES = "devices",
-	PROCESSES = "processes",
-	APPS = "apps",
-	SESSIONS = "sessions",
-	CREATE_NEW_SESSION = "createNewSession",
-	ATTACH_APP = "attachApp",
-	START_APP = "spawnApp",
-	REPLAY_REQUEST = "replayRequest",
-	ERROR = "error",
-	JSON_ERROR = "jsonError",
-	TRAFFIC_INIT = "trafficInit",
-	TRAFFIC_UPDATE = "trafficUpdate",
-	REPEATER_UPDATE = "repeaterUpdate",
-	REPLAY_UPDATE = "replayUpdate",
-	REPEATER_INIT = "repeaterInit",
-	SEND_TO_REPEATER = "sendToRepeater",
-	DUPLICATE_REPEATER = "duplicateRepeater",
-	DEVICE_UPDATE = "deviceUpdate",
-	SCRIPT_ERROR = "scriptError",
-	SCRIPT_OUTPUT = "scriptOutput",
-	SUCCESS_OUTPUT = "successOutput",
-	DETECT_PLATFORM = "detectDevicePlatform",
-	DETECT_LIBRARIES = "detectLibraries",
-	FIND_APP = "findApp",
-	LIBRARIES = "libraries",
-	CHANGE_LIBRARY = "changeLibrary",
-	CHOOSE_SESSION = "chooseSession",
-	CLEAR_ACTIVE_SESSION = "clearActiveSession",
-	GET_ACTIVE_SESSION = "getActiveSession",
-	DELETE_SESSION = "deleteSession",
-	CONNECTED_APP = "connectedApp",
-	GET_TRAFFIC = "getTraffic",
-	DELETE_REPEATER_TAB = "deleteRepeaterTab",
-	REPEATER_TAB_DELETED = "repeaterTabDeleted",
-	DELETE_LIBRARY = "deleteLibrary",
-	LIBRARY_DELETED = "libraryDeleted",
+	DASHBOARD_INIT = "dashboard.init",
+
+	SESSION_CREATE = "session.create",
+	SESSION_DELETE = "session.delete",
+	SESSION_CHOOSE = "session.choose",
+	SESSION_CLEAR = "session.clear",
+
+	TRAFFIC_INIT = "traffic.init",
+	
+	REPEATER_INIT = "repeater.init",
+	REPEATER_ADD = "repeater.add",
+	REPEATER_DUPLICATE = "repeater.duplicate",
+	REPEATER_DELETE = "repeater.delete",
+	REPEATER_UPDATE = "repeater.update",
+	REPEATER_REPLAY = "repeater.replay",
+	REPEATER_TAB_UPDATE = "repeater.tab.update",
+	
+	DEVICES_INIT = "devices.init",
+	DEVICES_REFRESH = "devices.refresh",
+	
+	APPS_INIT = "apps.init",
+	APPS_REFRESH = "apps.refresh",
+	APP_SPAWN = "app.spawn",
+	APP_ATTACH = "app.attach",
+	APP_DISCONNECT = "app.disconnect",
+
+	LIBRARY_CHANGE = "library.change",
+	LIBRARY_LIST = "library.list",
+	LIBRARY_DELETE = "library.delete",
+	
+
+	ERROR_GENERAL = "error.general",
+	JSON_ERROR = "error.json",
+}
+
+enum WebSocketResponses {
+	RSP_DASHBOARD_INIT = "dashboard.init.ack",
+	RSP_TRAFFIC_INIT = "traffic.init.ack",
+	RSP_REPEATER_INIT = "repeater.init.ack",
+	RSP_REPEATER_ADD = "repeater.add.ack",
+	RSP_REPEATER_DUPLICATE = "repeater.duplicate.ack",
+	RSP_REPEATER_DELETE = "repeater.delete.ack",
+	RSP_REPEATER_UPDATE = "repeater.update.ack",
+	RSP_REPEATER_REPLAY = "repeater.replay.ack",
+	RSP_REPEATER_TAB_UPDATE = "repeater.tab.update.ack",
+	RSP_DEVICES_INIT = "devices.init.ack",
+	RSP_DEVICES_REFRESH = "devices.refresh.ack",
+	RSP_APPS_INIT = "apps.init.ack",
+	RSP_APPS_REFRESH = "apps.refresh.ack",
+	RSP_APP_CONNECTION = "app.connection",
+	RSP_LIBRARY_CHANGE = "library.change.ack",
+	RSP_LIBRARY_LIST = "library.list.ack",
+	RSP_LIBRARY_DELETE = "library.delete.ack",
+
+	RSP_GENERAL_ACK = "general.ack",
 }
 
 /**
@@ -59,7 +78,7 @@ interface WebSocketResponse {
 }
 
 // Global active session for all clients
-let activeSession: SessionInfo = { session: null, app: null, status: false };
+let activeSession: SessionInfo = { session: null, app: null, status: false, channel: null };
 
 
 // FridaManager singleton - for handling Frida operations
@@ -97,12 +116,12 @@ class WebSocketClient {
 		try {
 			const trafficData: Object = await this.getDataFromDatabase();
 			this.send({
-				action: WebSocketAction.TRAFFIC_INIT,
+				action: WebSocketResponses.RSP_TRAFFIC_INIT,
 				message: JSON.stringify(trafficData),
 			});
 			const repeaterData: Object = await this.dbManager.getRepeaterTraffic();
 			this.send({
-				action: WebSocketAction.REPEATER_INIT,
+				action: WebSocketResponses.RSP_REPEATER_INIT,
 				message: JSON.stringify(repeaterData),
 			});
 		} catch (error) {
@@ -128,6 +147,13 @@ class WebSocketClient {
 	}
 
 	/**
+	 * Clear the active session
+	 */
+	private clearActiveSession(): void {
+		activeSession = { session: null, app: null, status: false, channel: null };
+	}
+
+	/**
 	 * Send a message to the client
 	 */
 	public send(data: WebSocketResponse): void {
@@ -141,7 +167,7 @@ class WebSocketClient {
 	 */
 	private sendError(message: string | string[]): void {
 		this.send({
-			action: WebSocketAction.ERROR,
+			action: WebSocketAction.ERROR_GENERAL,
 			message,
 		});
 	}
@@ -196,143 +222,105 @@ class WebSocketClient {
 		}
 
 		let devices: DeviceDetails[] = await fridaManager.getAllDevices();
+		let required_params: string[] = [];
+		let missing_params: string[] = [];
 
 		try {
 			console.log("Trying to handle action:", data.action);
 			switch (data.action) {
-				case WebSocketAction.SESSIONS:
-					const sessions = await this.dbManager.getSessions();
-					this.send({
-						action: "sessionList",
-						sessions,
-					});
+				case WebSocketAction.DASHBOARD_INIT:
+					await this.handleDashboardInit(data);
 					break;
-				case WebSocketAction.CREATE_NEW_SESSION:
+				case WebSocketAction.SESSION_CREATE:
 					if (!data.name) {
 						return this.sendJsonError(["Session name is required"]);
 					}
-					const sessionData = {
-						name: data.name,
-						config: JSON.stringify({
-							session: "No",
-							device: "No",
-							app: "No",
-							library: "No",
-						}),
-					};
-					const sessionId = await this.dbManager.createSession(sessionData);
-					if (sessionId > 0) {
-						await this.dbManager.setActiveSession(sessionId);
-						const newSession = (await this.dbManager.getSessions(sessionId))[0];
-						this.send({
-							action: "activeSession",
-							created: true,
-							session: newSession,
-						});
-					} else {
-						this.sendJsonError(["Failed to create session"]);
-					}
+					await this.handleSessionCreate(data);
 					break;
-				case WebSocketAction.CHOOSE_SESSION:
+				case WebSocketAction.SESSION_CHOOSE:
 					if (!data.session || !data.session.id) {
 						return this.sendJsonError(["Invalid session selected"]);
 					}
-					await this.dbManager.setActiveSession(data.session.id);
-					const t_session = await this.dbManager.getActiveSession();
-					this.send({
-						action: "activeSession",
-						session: t_session,
-					});
+					await this.handleSessionChoose(data);
 					break;
-				case WebSocketAction.CLEAR_ACTIVE_SESSION:
-					const cleared = await this.dbManager.clearActiveSession();
-					this.send({
-						action: "clearActiveSession",
-						status: cleared,
-					});
+				case WebSocketAction.SESSION_CLEAR:
+					await this.handleSessionClear(data);
 					break;
-				case WebSocketAction.DELETE_SESSION:
+				case WebSocketAction.SESSION_DELETE:
 					if (!data.session || !data.session.id) {
 						return this.sendJsonError(["Invalid session selected"]);
 					}
-					const deleted = await this.dbManager.deleteSession(data.session.id);
-					this.send({
-						action: "deleteSession",
-						status: deleted,
-						session: data.session.id,
-						message: deleted,
-					});
+					await this.handleSessionDelete(data);
 					break;
-				case WebSocketAction.GET_ACTIVE_SESSION:
-					this.send({
-						action: "activeSession",
-						session: await this.dbManager.getActiveSession(),
-					});
+				case WebSocketAction.DEVICES_INIT:
+					await this.handleDevicesInit(data);
 					break;
-				case WebSocketAction.DEVICES:
-					// Get all available devices
-					devices = await fridaManager.getAllDevices();
-					this.handleGetDevices(devices);
+				case WebSocketAction.DEVICES_REFRESH:
+					await this.handleDevicesInit(data, true);
 					break;
-				case WebSocketAction.PROCESSES:
-					await this.handleGetProcesses(data, devices);
+				case WebSocketAction.APPS_INIT:
+					if (!data.device) {
+						return this.sendJsonError(["Device is required"]);
+					}
+					await this.handleAppsInit(data);
 					break;
-				case WebSocketAction.APPS:
-					await this.handleGetApps(data, devices);
+				case WebSocketAction.APPS_REFRESH:
+					if (!data.device) {
+						return this.sendJsonError(["Device is required"]);
+					}
+					await this.handleAppsInit(data, true);
 					break;
-				case WebSocketAction.ATTACH_APP:
-					await this.handleAttachApp(data, devices);
+				case WebSocketAction.APP_SPAWN:
+					required_params = ["deviceId", "appId", "platform", "appName", "user"];
+					missing_params = this.checkMissingParams(data, required_params);
+					if (missing_params.length > 0) {
+						return this.sendJsonError(missing_params);
+					}
+					await this.handleAppSpawn(data);
 					break;
-				case WebSocketAction.START_APP:
-					await this.handleStartApp(data, devices);
+				case WebSocketAction.APP_ATTACH:
+					required_params = ["deviceId", "appId", "platform", "appName", "user"];
+					missing_params = this.checkMissingParams(data, required_params);
+					if (missing_params.length > 0) {
+						return this.sendJsonError(missing_params);
+					}
+					await this.handleAppAttach(data);
 					break;
-				case WebSocketAction.REPLAY_REQUEST:
-					await this.handleReplayRequest(data);
+				case WebSocketAction.APP_DISCONNECT:
+					await this.handleAppDisconnect(data);
 					break;
-				case WebSocketAction.DETECT_LIBRARIES:
-					await this.handleDetectLibraries(data);
+				case WebSocketAction.LIBRARY_CHANGE:
+					await this.handleLibraryChange(data);
 					break;
-				case WebSocketAction.REPEATER_UPDATE:
-					await this.handleRepeaterUpdate(data);
+				case WebSocketAction.LIBRARY_LIST:
+					await this.handleLibraryList(data);
 					break;
-				case WebSocketAction.SEND_TO_REPEATER:
-					await this.handleSendToRepeater(data);
-					break;
-				case WebSocketAction.DUPLICATE_REPEATER:
-					await this.handleDuplicateRepeater(data);
-					break;
-				case WebSocketAction.REPEATER_INIT:
-					await this.handleRepeaterInit(data);
+				case WebSocketAction.LIBRARY_DELETE:
+					await this.handleLibraryDelete(data);
 					break;
 				case WebSocketAction.TRAFFIC_INIT:
 					await this.handleTrafficInit(data);
 					break;
-				case WebSocketAction.LIBRARIES:
-					await this.handleGetLibraries(data);
+				case WebSocketAction.REPEATER_INIT:
+					await this.handleRepeaterInit(data);
 					break;
-				case WebSocketAction.CHANGE_LIBRARY:
-					const tmpLibrary = data["library"]["file"];
-					if (!activeSession) {
-						return this.sendError(["No active session"]); 
-					}
-					activeSession.app!.library = data["library"]["file"];
-					const repl = new REPLManager(activeSession, this.manager, this.dbManager);
-					repl.run_script(tmpLibrary);
+				case WebSocketAction.REPEATER_ADD:
+					await this.handleRepeaterAdd(data);
 					break;
-				case WebSocketAction.FIND_APP:
-					await this.handleFindApp(data.deviceId, data.packageName);
+				case WebSocketAction.REPEATER_DUPLICATE:
+					await this.handleRepeaterDuplicate(data);
 					break;
-				case WebSocketAction.CONNECTED_APP:
-					await this.handleConnectedApp(data);
+				case WebSocketAction.REPEATER_DELETE:
+					await this.handleRepeaterDelete(data);
 					break;
-				case WebSocketAction.GET_TRAFFIC:
-					await this.handleGetTraffic(data);
+				case WebSocketAction.REPEATER_UPDATE:
+					await this.handleRepeaterUpdate(data);
 					break;
-				case WebSocketAction.DELETE_REPEATER_TAB:
-					await this.handleDeleteRepeaterTab(data);
+				case WebSocketAction.REPEATER_REPLAY:
+					await this.handleRepeaterReplay(data);
 					break;
-				case WebSocketAction.DELETE_LIBRARY:
-					await this.handleDeleteLibrary(data);
+				case WebSocketAction.REPEATER_TAB_UPDATE:
+					await this.handleRepeaterTabUpdate(data);
 					break;
 				default:
 					this.sendJsonError(["Unknown action: " + data.action]);
@@ -350,104 +338,320 @@ class WebSocketClient {
 		}
 	}
 
-	private async handleDeleteLibrary(data: any): Promise<void> {
-		console.log("Deleting library", data);
-		this.dbManager.deleteLibrary(data.libraryId, (success) => {
-			if (success) {
-				console.log("Library deleted successfully", data.libraryId);
+	private async handleLibraryChange(data: any): Promise<void> {
+		const tmpLibrary = data.library.file;
+		if (!activeSession) {
+			return this.sendError("No active session"); 
+		}
+		activeSession.app!.library = tmpLibrary;
+		const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+		await repl.run_script(tmpLibrary);
+	}
+
+	private async handleLibraryList(data: any): Promise<void> {
+		const libraries = await this.dbManager.getLibraries();
+		this.send({
+			action: WebSocketResponses.RSP_LIBRARY_LIST,
+			libraries: libraries,
+		});
+	}
+
+	private async handleLibraryDelete(data: any): Promise<void> {
+		this.dbManager.deleteLibrary(data.libraryId, (deleted: boolean) => {
+			if (!deleted) {
+				this.sendError("Failed to delete library");
+			} else {
 				this.send({
-					action: WebSocketAction.LIBRARY_DELETED,
-					id: data.libraryId,
+					action: WebSocketResponses.RSP_LIBRARY_DELETE,
+					status: true,
+					libraryId: data.libraryId,
+					message: "Library deleted successfully",
 				});
 			}
 		});
 	}
 
-	private async handleDeleteRepeaterTab(data: any): Promise<void> {
-		console.log("Deleting repeater tab", data);
-		await this.dbManager.deleteRepeaterTab(data.id);
-		this.send({
-			action: WebSocketAction.REPEATER_TAB_DELETED,
-			id: data.id,
-		});
-	}
-
-	private async handleGetTraffic(data: any): Promise<void> {
-		const traffic = await this.dbManager.getTrafficBySession(data.session);
-		this.send({
-			action: WebSocketAction.TRAFFIC_INIT,
-			message: JSON.stringify(traffic),
-		});
-		const replayTraffic = await this.dbManager.getRepeaterTrafficBySession(data.session);
-		this.send({
-			action: WebSocketAction.REPEATER_INIT,
-			message: JSON.stringify(replayTraffic),
-		});
-	}
-
-	private async sessionEventCallback(session: SessionInfo): Promise<void> {
-		console.log(`Session event: connected=${session.status}, session=`, session);
-		if(session.status === true && session.session) {
-			console.log("Session connected");
-			activeSession = { session: session.session, app: session.app, status: true};
-			await fridaManager.saveActiveSession(session.session);
-		} else {
-			console.log("Session disconnected");
-			activeSession = { session: null, app: null, status: false };
-			await fridaManager.saveActiveSession(null);
+	private async handleAppSpawn(data: any): Promise<void> {
+		if(activeSession.channel) {
+			activeSession.channel.disconnect();
+			console.log("[handleAppSpawn] Disconnected active session");
 		}
-		// this.send({
-		// 	action: WebSocketAction.CONNECTED_APP,
-		// 	status: isConnected,
-		// 	app: activeSession,
-		// });
+
+		let result = await fridaManager.launchApp(data.deviceId, data.appId, data.user);
+		if(!result.status) {
+			this.sendError(result.error?.toString() || "Failed to launch app");
+			return;
+		}
+
+		const session = result.output;
+		const t_app: App = {
+			id: data.appId,
+			name: data.appName,
+			platform: data.platform,
+			deviceId: data.deviceId,
+			user: data.user,
+			library: data.library,
+		};
+
+		const channel = new Channels(
+			session,
+			data.appName,
+			data.appId,
+			data.library,
+			data.deviceId,
+			data.platform,
+			data.user,
+			this.manager,
+			-1,
+			this.sessionEventCallback,
+			data.sessionId
+		);
+
+		channel.connect();
+
+		activeSession = { session: session, app: t_app, status: true, channel: channel };
+		await fridaManager.saveActiveSession(session);
+
+		if (data.library) {
+			console.log("[REPL] (handleAppSpawn) Running script: " + data.library);
+			const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+			await repl.run_script(data.library);
+		} else {
+			this.sendJsonError(["No library provided"]);
+		}
+
 	}
 
-	private async handleConnectedApp(data: any): Promise<void> {
+	private async handleAppAttach(data: any): Promise<void> {
+		const t_process = await fridaManager.findProcesses(data.deviceId, data.appName);
+		if(!t_process.length) {
+			this.sendError("Process not found");
+			return;
+		}
+
+		console.log("[handleAppAttach] Process:", t_process);
+
+
+		const session = await fridaManager.attachToApp(data.deviceId, t_process[0].pid);
+
+		const t_app: App = {
+			id: data.appId,
+			name: data.appName,
+			platform: data.platform,
+			deviceId: data.deviceId,
+			user: data.user,
+			library: data.library,
+		};
+
+		const channel = new Channels(
+			session,
+			data.appName,
+			data.appId,
+			data.library,
+			data.deviceId,
+			data.platform,
+			data.user,
+			this.manager,
+			-1,
+			this.sessionEventCallback,
+			data.sessionId
+		);
+
+		channel.connect();
+
+		activeSession = { session: session, app: t_app, status: true, channel: channel };
+		await fridaManager.saveActiveSession(session);
+
+		if (data.library) {
+			console.log("[REPL] (handleAppSpawn) Running script: " + data.library);
+			const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+			await repl.run_script(data.library);
+		} else {
+			this.sendJsonError(["No library provided"]);
+		}
+	}
+
+	private async handleDashboardInit(data: any): Promise<void> {
+		let sessionsData: any[] = await this.dbManager.getSessions();
+		let devicesData: any[] = await fridaManager.getAllDevices();
+		let librariesData: any[] = await this.dbManager.getLibraries();
+
+		let devices: DeviceInfo[] = [];
+		for (let device of devicesData) {
+			let users = [];
+			if(device.platform.toLowerCase() == "android") {
+				users = await fridaManager.getAndroidUsersInfo(device.id);
+			} else {
+				users = await fridaManager.getApplications(device.id);
+			}
+			devices.push({
+				id: device.id,
+				name: device.name,
+				type: device.type,
+				platform: device.platform,
+				users: users,
+			});
+		}
+
+		let dashboardData: DashboardData = {
+			sessions: sessionsData,
+			devices: devices,
+			libraries: librariesData,
+			activeSession: await this.dbManager.getActiveSession(),
+		};
 		this.send({
-			action: WebSocketAction.CONNECTED_APP,
-			status: activeSession.session ? true : false,
-			app: activeSession.app,
-			session: activeSession.session,
+			action: WebSocketResponses.RSP_DASHBOARD_INIT,
+			data: dashboardData,
 		});
 	}
 
-	private async handleGetLibraries(data: any): Promise<void> {
-		const libraries = await this.dbManager.getLibraries();
+	private async handleSessionCreate(data: any): Promise<void> {
+		const sessionData = {
+			name: data.name,
+			config: JSON.stringify({
+				session: "No",
+				device: "No",
+				app: "No",
+				library: "No",
+			}),
+		};
+		const sessionId = await this.dbManager.createSession(sessionData);
+		if (sessionId > 0) {
+			await this.dbManager.setActiveSession(sessionId);
+			const newSession = (await this.dbManager.getSessions(sessionId))[0];
+			this.send({
+				action: "session.create.ack",
+				created: true,
+				session: newSession,
+			});
+		} else {
+			this.sendJsonError(["Failed to create session"]);
+		}
+	}
+
+	private async handleSessionChoose(data: any): Promise<void> {
+		if (!data.session || !data.session.id) {
+			return this.sendJsonError(["Invalid session selected"]);
+		}
+		await this.dbManager.setActiveSession(data.session.id);
+		const t_session = await this.dbManager.getActiveSession();
 		this.send({
-			action: WebSocketAction.LIBRARIES,
-			libraries,
+			action: "session.choose.ack",
+			session: t_session,
+		});
+	}
+
+	private async handleSessionClear(data: any): Promise<void> {
+		const cleared = await this.dbManager.clearActiveSession();
+		this.send({
+			action: "session.clear.ack",
+			status: cleared,
+		});
+	}
+
+	private async handleSessionDelete(data: any): Promise<void> {
+		if (!data.session || !data.session.id) {
+			return this.sendJsonError(["Invalid session selected"]);
+		}
+		const deleted = await this.dbManager.deleteSession(data.session.id);
+		this.send({
+			action: "session.delete.ack",
+			status: deleted,
+			session: data.session.id,
+			message: deleted,
+		});
+	}
+
+	private async handleDevicesInit(data: any, refresh: boolean = false): Promise<void> {
+		let devicesData: any[] = await fridaManager.getAllDevices();
+		let devices: DeviceInfo[] = [];
+		for (let device of devicesData) {
+			let users = [];
+			if(device.platform.toLowerCase() == "android") {
+				users = await fridaManager.getAndroidUsersInfo(device.id);
+			} else {
+				users = await fridaManager.getApplications(device.id);
+			}
+			devices.push({
+				id: device.id,
+				name: device.name,
+				type: device.type,
+				platform: device.platform,
+				users: users,
+			});
+		}
+		this.send({
+			action: refresh ? WebSocketResponses.RSP_DEVICES_REFRESH : WebSocketResponses.RSP_DEVICES_INIT,
+			data: devices,
+		});
+	}
+
+	private async handleAppsInit(data: any, refresh: boolean = false): Promise<void> {
+		const t_device = data.device;
+		const t_platform = data.platform;
+		let users;
+		if(t_platform.toLowerCase() == "android") {
+			users = await fridaManager.getAndroidUsersInfo(t_device);
+		} else {
+			users = await fridaManager.getApplications(t_device);
+		}
+		this.send({
+			action: refresh ? WebSocketResponses.RSP_APPS_REFRESH : WebSocketResponses.RSP_APPS_INIT,
+			platform: t_platform,
+			data: users,
+		});
+	}
+
+	private async handleAppDisconnect(data: any): Promise<void> {
+		console.log("[handleAppDisconnect] App disconnected");
+		if(activeSession.channel) {
+			activeSession.channel.disconnect();
+		}
+		activeSession = { session: null, app: null, status: false, channel: null };
+		await fridaManager.saveActiveSession(null);
+		console.log("[handleAppDisconnect] Active session cleared");
+		this.send({
+			action: WebSocketResponses.RSP_APP_CONNECTION,
+			status: true,
 		});
 	}
 
 	private async handleTrafficInit(data: any): Promise<void> {
-		const traffic = await this.dbManager.getSessionTraffic();
+		const trafficData: Object = await this.getDataFromDatabase();
 		this.send({
-			action: WebSocketAction.TRAFFIC_INIT,
-			traffic,
+			action: WebSocketResponses.RSP_TRAFFIC_INIT,
+			message: JSON.stringify(trafficData),
 		});
 	}
 
 	private async handleRepeaterInit(data: any): Promise<void> {
 		const traffic = await this.dbManager.getRepeaterTraffic();
 		this.send({
-			action: WebSocketAction.REPEATER_INIT,
-			traffic,
+			action: WebSocketResponses.RSP_REPEATER_INIT,
+			message: JSON.stringify(traffic),
 		});
 	}
 
-	private async handleDuplicateRepeater(data: any): Promise<void> {
+	private async handleRepeaterDuplicate(data: any): Promise<void> {
 		const traffic = await this.dbManager.getRepeaterTraffic();
 		this.send({
-			action: WebSocketAction.DUPLICATE_REPEATER,
+			action: WebSocketResponses.RSP_REPEATER_DUPLICATE,
 			traffic,
 		});
 	}
 
-	private async handleSendToRepeater(data: any): Promise<void> {
+	private async handleRepeaterDelete(data: any): Promise<void> {
+		await this.dbManager.deleteRepeaterTab(data.id);
+		this.send({
+			action: WebSocketResponses.RSP_REPEATER_DELETE,
+			id: data.id,
+		});
+	}
+
+	private async handleRepeaterAdd(data: any): Promise<void> {
 		const output = await this.dbManager.sendToRepeater(data.id);
 		this.send({
-			action: WebSocketAction.REPEATER_UPDATE,
+			action: WebSocketResponses.RSP_REPEATER_ADD,
 			traffic: JSON.stringify(output),
 		});
 	}
@@ -455,305 +659,12 @@ class WebSocketClient {
 	private async handleRepeaterUpdate(data: any): Promise<void> {
 		const traffic = await this.dbManager.getRepeaterTraffic();
 		this.send({
-			action: WebSocketAction.REPEATER_UPDATE,
+			action: WebSocketResponses.RSP_REPEATER_UPDATE,
 			traffic: JSON.stringify(traffic),
 		});
 	}
 
-	/**
-	 * Handle the 'devices' action - get all available devices
-	 */
-	private handleGetDevices(devices: DeviceDetails[]): void {
-		console.log("Sending", devices);
-		this.send({
-			action: WebSocketAction.DEVICES,
-			devices,
-		});
-	}
-
-	/**
-	 * Handle the 'processes' action - get all processes on a device
-	 */
-	private async handleGetProcesses(
-		data: any,
-		availableDevices: DeviceDetails[]
-	): Promise<void> {
-		const deviceId = data.deviceId;
-
-		if (!deviceId) {
-			return this.sendJsonError("deviceId not provided");
-		}
-
-		const deviceExists = availableDevices.some(
-			(device) => device.id === deviceId
-		);
-
-		if (!deviceExists) {
-			return this.sendError("No such device found!");
-		}
-
-		const processes = await fridaManager.findProcesses(deviceId, "");
-		this.send({
-			action: WebSocketAction.PROCESSES,
-			processes,
-		});
-	}
-
-	/**
-	 * Handle the 'apps' action - get all apps on a device
-	 */
-	private async handleGetApps(
-		data: any,
-		availableDevices: DeviceDetails[]
-	): Promise<void> {
-		const deviceId = data.deviceId;
-
-		if (!deviceId) {
-			return this.sendJsonError("deviceId not provided");
-		}
-
-		const deviceExists = availableDevices.some(
-			(device) => device.id === deviceId
-		);
-
-		if (!deviceExists) {
-			return this.sendError("No such device found!");
-		}
-
-		const [apps, error] = await fridaManager.getApplications(deviceId);
-
-		if (error) {
-			return this.sendError(error);
-		}
-
-		this.send({
-			action: WebSocketAction.APPS,
-			apps,
-		});
-	}
-
-	private async handleFindApp(
-		deviceId: string,
-		packageName: string
-	): Promise<any> {
-		if (!deviceId) {
-			return this.sendJsonError("deviceId not provided");
-		}
-		const devices = await fridaManager.getAllDevices();
-		const foundDevice = devices.find((device) => device.id === deviceId);
-		if (!foundDevice) {
-			return this.sendError("No such device found!");
-		}
-		const [apps, error] = await fridaManager.getApplications(deviceId);
-		if (error) {
-			return this.sendError(error);
-		}
-		if (!apps.length) {
-			return this.sendError("No apps found!");
-		}
-		const app = apps.find((app) => app.id === packageName);
-		if (!app) {
-			return this.sendError("App not found!");
-		}
-		this.send({
-			action: WebSocketAction.FIND_APP,
-			app: app,
-			device: foundDevice,
-		});
-	}
-
-	/**
-	 * Handle the 'attachApp' action - attach to a running app
-	 */
-	private async handleAttachApp(
-		data: any,
-		availableDevices: DeviceDetails[]
-	): Promise<void> {
-		console.log("handleAttachApp", data);
-		const requiredParams: string[] = [
-			"appId",
-			"appName",
-			"library",
-			"deviceId",
-		];
-		const missingParams = this.checkMissingParams(data, requiredParams);
-
-		if (missingParams.length > 0) {
-			return this.sendJsonError(missingParams);
-		}
-
-		const deviceId = data.deviceId;
-		const deviceExists = availableDevices.some(
-			(device) => device.id === deviceId
-		);
-
-		if (!deviceExists) {
-			return this.sendError("No such device found!");
-		}
-
-		const { appId, appName, sessionId, library } = data;
-
-		// Find the process by name
-		const processes = await fridaManager.findProcesses(deviceId, appName);
-
-		if (!processes.length) {
-			return this.sendError(["App not running!"]);
-		}
-
-		console.log("Found processes:", processes);
-
-		const processId = processes[0].pid;
-		console.log("Attaching to process:", processId);
-
-		// Attach to the process
-		try {
-			const session = await fridaManager.attachToApp(deviceId, processId);
-
-			// Track the session
-			activeSession = { session, app: null, status: false };
-			await fridaManager.saveActiveSession(session);
-
-			// Create a channel to monitor the app
-			const channel = new Channels(
-				session,
-				appName,
-				appId,
-				library,
-				deviceId,
-				this.manager,
-				processId,
-				this.sessionEventCallback
-			);
-
-			channel.connect();
-
-			// Run the requested script
-			if (library) {
-				const repl = new REPLManager(activeSession, this.manager, this.dbManager);
-				await repl.run_script(library);
-			} else {
-				this.sendJsonError(["No library provided"]);
-			}
-		} catch (error) {
-			console.error("Error attaching to app:", error);
-			this.sendError(
-				`Failed to attach to app: ${
-					error instanceof Error ? error.message : String(error)
-				}`
-			);
-		}
-	}
-
-	/**
-	 * Handle the 'startApp' action - launch an app
-	 */
-	private async handleStartApp(
-		data: any,
-		availableDevices: DeviceDetails[]
-	): Promise<void> {
-		const requiredParams = ["appId", "appName", "library", "deviceId"];
-		const missingParams = this.checkMissingParams(data, requiredParams);
-
-		if (missingParams.length > 0) {
-			return this.sendJsonError(missingParams);
-		}
-
-		const deviceId = data.deviceId;
-		const deviceExists = availableDevices.some(
-			(device) => device.id === deviceId
-		);
-
-		if (!deviceExists) {
-			return this.sendError("No such device found!");
-		}
-
-		console.log("Starting app:", data);
-		const { appId, appName, device, library, platform } = data;
-
-		// Launch the app
-		try {
-			const result = await fridaManager.launchApp(deviceId, appId);
-
-			if (!result.status) {
-				return this.sendError(result.error || "Failed to launch app");
-			}
-
-			const session = result.output;
-
-			const t_app: App = {
-				identifier: appId,
-				platform: platform,
-				deviceId: deviceId,
-				name: appName,
-				library: library,
-			};
-
-			// Track the session
-			activeSession = { session: session, app: t_app, status: true };
-			console.log("New Session:", activeSession);
-			await fridaManager.saveActiveSession(session);
-			console.log(activeSession);
-			
-
-			// Create a channel to monitor the app
-			const channel = new Channels(
-				session,
-				appName,
-				appId,
-				library,
-				deviceId,
-				this.manager,
-				-1,
-				this.sessionEventCallback
-			);
-
-			channel.connect();
-
-			// Run the requested script
-			if (library) {
-				const repl = new REPLManager(activeSession, this.manager, this.dbManager);
-				await repl.run_script(library);
-			} else {
-				this.sendJsonError(["No library provided"]);
-			}
-		} catch (error) {
-			console.error("Error launching app:", error);
-			this.sendError(
-				`Failed to launch app: ${
-					error instanceof Error ? error.message : String(error)
-				}`
-			);
-		}
-	}
-
-	/**
-	 * Handle the 'detectLibraries' action - detect libraries in the app
-	 */
-	private async handleDetectLibraries(data: any): Promise<void> {
-		console.log("Detecting libraries");
-		// const sessionId = data["sessionId"];
-		// console.log(this.sessions);
-		// const tmpSession = this.sessions.map((item) => {
-		// 	if (item.id == sessionId) {
-		// 		return item;
-		// 	}
-		// });
-		// if (tmpSession.length > 0) {
-		// 	if (tmpSession[0]) {
-		// 		//console.log(tmpSession[0]);
-		// 		const repl = new REPLManager(
-		// 			tmpSession[0]["session"],
-		// 			this.manager
-		// 		);
-		// 		repl.detect_libraries();
-		// 	}
-		// }
-	}
-
-	/**
-	 * Handle the 'replayRequest' action - replay a previous request
-	 */
-	private async handleReplayRequest(data: any): Promise<void> {
+	private async handleRepeaterReplay(data: any): Promise<void> {
 		const replayPayload = data.replay;
 		const platform = data.platform;
 
@@ -800,6 +711,30 @@ class WebSocketClient {
 					error instanceof Error ? error.message : String(error)
 				}`
 			);
+		}
+	}
+
+	private async handleRepeaterTabUpdate(data: any): Promise<void> {
+		const result = await this.dbManager.updateRepeaterTitle(data.id, data.title);
+		if (result) {
+			this.send({
+				action: WebSocketResponses.RSP_REPEATER_TAB_UPDATE,
+				id: data.id,
+				title: data.title,
+			});
+		}
+	}
+
+	private async sessionEventCallback(session: SessionInfo): Promise<void> {
+		console.log(`Session event: connected=${session.status}, session=`, session);
+		if(session.status === true && session.session) {
+			console.log("Session connected");
+			activeSession = { session: session.session, app: session.app, status: true, channel: session.channel};
+			await fridaManager.saveActiveSession(session.session);
+		} else {
+			console.log("Session disconnected");
+			activeSession = { session: null, app: null, status: false, channel: null };
+			await fridaManager.saveActiveSession(null);
 		}
 	}
 

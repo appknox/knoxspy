@@ -4,18 +4,22 @@
 			<div class="status-item" data-tooltip="Websocket Server">
 				<div class="status-badge" :class=" ws.isConnected ? 'status-badge-green' : 'status-badge-red'">
 					<div class="status-icon">
-						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<svg v-if="ws.isConnected" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+						</svg>
+						<svg v-else xmlns="http://www.w3.org/2000/svg" class="h-* w-* text-gray-500 flex-shrink-0 spin-svg" fill="none" viewBox="0 0 16 16" stroke="currentColor" stroke-width="1">
+							<path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+							<path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
 						</svg>
 					</div>
 					<div class="status-text">	
 						<span><b style="color: #ddd">Server:</b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ ws.isConnected ? 'Connected' : 'Not Connected' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ ws.isConnected ? 'Connected' : 'Connecting..' }}</span>
 					</div>
 				</div>
 			</div>
 			<div class="status-item" data-tooltip="App Connection">
-				<div class="status-badge" :class="currentSession.app.connectedApp && currentSession.app.connectedApp.status ? 'status-badge-green' : 'status-badge-red'">
+				<div class="status-badge" :class="cs.getStatus.appStatus ? 'status-badge-green' : 'status-badge-red'">
 					<div class="status-icon">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
@@ -23,7 +27,7 @@
 					</div>
 					<div class="status-text" @click="showConnectedApp()">	
 						<span><b style="color: #ddd">App:</b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ currentSession.app.connectedApp && currentSession.app.connectedApp.status ? 'Connected' : 'Not Connected' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getStatus.appStatus ? 'Connected' : 'Not Connected' }}</span>
 					</div>
 				</div>
 			</div>
@@ -33,7 +37,7 @@
 
 		<div class="status-group status-group-right" style="flex-grow: 1;">
 			<div class="status-item" data-tooltip="Selected Session" @click="toggleDropdown('session')" :class="showDropdown.session ? 'status-item-highlighted' : ''">
-				<div class="status-badge" :class="currentSession.app.selectedSession ? 'status-badge-blue' : 'status-badge-light-blue'">
+				<div class="status-badge" :class="cs.getSelection.session ? 'status-badge-blue' : 'status-badge-light-blue'">
 					<div class="status-icon">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
@@ -41,7 +45,7 @@
 					</div>
 					<div class="status-text">	
 						<span><b style="color: #ccc">Session: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ currentSession.app.selectedSession ? currentSession.app.selectedSession.name : 'No session selected' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getStatus.sessionStatus ? (cs.getSelection.session.name ? cs.getSelection.session.name : 'No session selected') : 'No session selected' }}</span>
 					</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -51,14 +55,14 @@
 				</div>
 				<div class="bottom-bar-dropdown" v-if="showDropdown.session">
 					<ul>
-						<li v-for="session in currentSession.app.sessions" :key="session.id" @click="toggleDropdownItem('session', session.id)">
+						<li v-for="session in cs.getData.sessions" :key="session.id" @click="toggleDropdownItem('session', session.id)">
 							• {{ session.name }}
 						</li>
 					</ul>
 				</div>
 			</div>
 			<div class="status-item" data-tooltip="Selected Device" @click="toggleDropdown('device')" :class="showDropdown.device ? 'status-item-highlighted' : ''">
-				<div class="status-badge" :class="currentSession.app.selectedDevice ? 'status-badge-blue' : 'status-badge-light-blue'">
+				<div class="status-badge" :class="cs.getSelection.device ? 'status-badge-blue' : 'status-badge-light-blue'">
 					<div class="status-icon">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" />
@@ -66,7 +70,7 @@
 					</div>
 					<div class="status-text">	
 						<span><b style="color: #ccc">Device: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ currentSession.app.selectedDevice ? currentSession.app.selectedDevice.name : 'No device selected' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.device ? cs.getSelection.device.name : 'No device selected' }}</span>
 					</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -76,14 +80,14 @@
 				</div>
 				<div class="bottom-bar-dropdown" v-if="showDropdown.device">
 					<ul>
-						<li v-for="device in currentSession.app.devices" :key="device.id" @click="toggleDropdownItem('device', device.id)">
+						<li v-for="device in cs.getData.devices" :key="device.id" @click="toggleDropdownItem('device', device.id)">
 							• {{ device.name }}
 						</li>
 					</ul>
 				</div>
 			</div>
-			<div class="status-item app-status-item" data-tooltip="Selected App" @click="toggleDropdown('app')" :class="showDropdown.app ? 'status-item-highlighted' : ''">
-				<div class="status-badge" :class="currentSession.app.selectedApp ? 'status-badge-blue' : 'status-badge-light-blue'">
+			<div class="status-item app-status-item" data-tooltip="Selected App" @click="" :class="showDropdown.app ? 'status-item-highlighted' : ''">
+				<div class="status-badge" :class="cs.getSelection.app ? 'status-badge-blue' : 'status-badge-light-blue'">
 					<div class="status-icon">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
@@ -91,9 +95,9 @@
 					</div>
 					<div class="status-text">
 						<span><b style="color: #ccc">App: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ currentSession.app.selectedApp ? currentSession.app.selectedApp.name : 'No app selected' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.app.name ? cs.getSelection.app.name : 'No app selected' }}</span>
 					</div>
-					<div class="status-arrow">
+					<div class="status-arrow" style="display: none">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
 						</svg>
@@ -101,14 +105,14 @@
 				</div>
 				<div class="bottom-bar-dropdown" v-if="showDropdown.app" style="max-height: 200px; overflow-y: scroll; overflow-x: hidden">
 					<ul>
-						<li v-for="app in currentSession.app.apps" :key="app.id" @click="toggleDropdownItem('app', app.id)">
+						<li v-for="app in cs.getSelection.apps" :key="app.id" @click="toggleDropdownItem('app', app.id)">
 							• {{ app.name }}
 						</li>
 					</ul>
 				</div>
 			</div>
 			<div class="status-item" data-tooltip="Selected Platform" :class="showDropdown.platform ? 'status-item-highlighted' : ''">
-				<div class="status-badge" :class="currentSession.app.selectedPlatform ? 'status-badge-blue' : 'status-badge-light-blue'">
+				<div class="status-badge" :class="cs.getSelection.platform ? 'status-badge-blue' : 'status-badge-light-blue'">
 					<div class="status-icon">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 3v1.5M4.5 8.25H3m18 0h-1.5M4.5 12H3m18 0h-1.5m-15 3.75H3m18 0h-1.5M8.25 19.5V21M12 3v1.5m0 15V21m3.75-18v1.5m0 15V21m-9-1.5h10.5a2.25 2.25 0 0 0 2.25-2.25V6.75a2.25 2.25 0 0 0-2.25-2.25H6.75A2.25 2.25 0 0 0 4.5 6.75v10.5a2.25 2.25 0 0 0 2.25 2.25Zm.75-12h9v9h-9v-9Z" />
@@ -116,12 +120,12 @@
 					</div>
 					<div class="status-text">
 						<span ><b style="color: #ccc">Platform: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ currentSession.app.selectedDevice ? currentSession.app.selectedDevice.platform : 'No platform' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.platform ? cs.getSelection.platform : 'No platform' }}</span>
 					</div>
 				</div>
 			</div>
 			<div class="status-item" data-tooltip="Selected Library" @click="toggleDropdown('library')" :class="showDropdown.library ? 'status-item-highlighted' : ''">
-				<div class="status-badge" :class="currentSession.app.selectedLibrary ? 'status-badge-blue' : 'status-badge-light-blue'">
+				<div class="status-badge" :class="cs.getSelection.library ? 'status-badge-blue' : 'status-badge-light-blue'">
 					<div class="status-icon">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
@@ -129,7 +133,7 @@
 					</div>
 					<div class="status-text">
 						<span ><b style="color: #ccc">Library: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ currentSession.app.selectedLibrary ? currentSession.app.selectedLibrary.file : 'No library' }}</span>
+						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.library.file ? cs.getSelection.library.file : 'No library selected' }}</span>
 					</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -139,7 +143,7 @@
 				</div>
 				<div class="bottom-bar-dropdown" v-if="showDropdown.library">
 					<ul>
-						<li v-for="library in currentSession.app.libraries" :key="library.id" @click="toggleDropdownItem('library', library.file)">
+						<li v-for="library in cs.getData.libraries" :key="library.id" @click="toggleDropdownItem('library', library.file)">
 							• {{ library.name }}
 						</li>
 					</ul>
@@ -154,12 +158,17 @@ import { defineComponent, watch } from "vue";
 import { useAppStore, useWebSocketStore } from "../stores/session";
 import InlineMessage from "primevue/inlineMessage";
 
+/** ToDo
+- On clicking App Connection, check if data is loaded or not for app to launch
+- 
+*/
+
 export default defineComponent({
-	emits: ["sessionUpdated", "deviceUpdated", "appUpdated", "libraryUpdated", "appListUpdated", "appConnected", "appDisconnected", "dashboardUpdated"],
+	emits: ["dashboardReady"],
 	name: "Footer",
 	data() {
         return {
-            currentSession: useAppStore(),
+            cs: useAppStore(),
 			ws: useWebSocketStore(),
 			didPageLoad: false,
 			showDropdown: {
@@ -185,6 +194,15 @@ export default defineComponent({
 		this.ws.addOnOpenHandler(this.wsReady);
 		this.ws.addOnMessageHandler(this.wsMessage);
 	},
+	mounted() {
+		watch(() => this.cs.getStatus.sidebarStatus, (newVal, oldVal) => {
+			if(newVal) {
+				document.getElementsByClassName("status-indicator-wrapper")[0].classList.add("shrink");
+			} else {
+				document.getElementsByClassName("status-indicator-wrapper")[0].classList.remove("shrink");
+			}
+		});
+	},
 	methods: {
 		toggleDropdown(key) {
 			this.showDropdown[key] = !this.showDropdown[key];
@@ -194,198 +212,173 @@ export default defineComponent({
 		},
 		toggleDropdownItem(key, id) {
 			if(key === "session") {
-				const t_sess = this.currentSession.app.sessions.find(session => session.id === id);
-				this.currentSession.setSelectedSession(t_sess);
-				this.ws.send(JSON.stringify({ action: "chooseSession", session: t_sess}));
-				this.$emit("sessionUpdated", this.currentSession.app.selectedSession);
+				const t_sess = this.cs.getData.sessions.find(session => session.id === id);
+				this.ws.send(JSON.stringify({ action: "session.choose", session: t_sess}));
 			} else if(key === "device") {
-				this.currentSession.setSelectedDevice(this.currentSession.app.devices.find(device => device.id === id));
-				// this.$emit("deviceUpdated", this.currentSession.app.selectedDevice);
+				const t_device = this.cs.getData.devices.find(device => device.id === id);
+				console.log("Footer(toggleDropdownItem): Device selected:", t_device);
+				this.cs.setSelectionKey("device", t_device);
+				const t_platform = t_device.platform;
+				this.cs.setSelectionKey("platform", t_platform);
+				let t_apps = [];
+				if(t_platform.toLowerCase() === "android") {
+					t_apps = t_device.users.filter(user => user.id == "0")[0].apps;
+					this.cs.setDataKey("users", t_device.users);
+					this.cs.setSelectionKey("user", t_device.users.filter(user => user.id == "0")[0]);
+				} else {
+					t_apps = t_device.users[0];
+					this.cs.setDataKey("users", []);
+					this.cs.setSelectionKey("user", {});
+				}
+				this.cs.setSelectionKey("apps", t_apps);
+				console.log("Footer(toggleDropdownItem): Selected Data:", this.cs.getSelection, this.cs.getData);
+				
 			} else if(key === "app") {
-				const t_app = this.currentSession.app.apps.find(app => app.id === id);
+				const t_app = this.cs.getSelection
 				console.log("App selected:", t_app);
-				this.currentSession.setSelectedApp(t_app, true);
-				this.startApp(t_app.id, "spawn");
-				// this.$emit("appUpdated", this.currentSession.app.selectedApp);
 			} else if(key === "platform") {
-				this.currentSession.setSelectedPlatform(this.currentSession.app.platforms.find(platform => platform.id === id));
+				// this.currentSession.setSelectedPlatform(this.currentSession.app.platforms.find(platform => platform.id === id));
 			} else if(key === "library") {
-				this.currentSession.setSelectedLibrary(id);
-				const t_lib = this.currentSession.app.libraries.find(lib => lib.file === id);
-				this.ws.send(JSON.stringify({ action: "changeLibrary", library: t_lib }));
-				this.$emit("libraryUpdated", this.currentSession.app.selectedLibrary);
+				const t_lib = this.cs.getData.libraries.find(lib => lib.file === id);
+				this.ws.send(JSON.stringify({ action: "library.change", library: t_lib }));
 			}
 		},
 		populateDropdown(key) {
-			if (key === "session") {
-				this.ws.send(JSON.stringify({ action: "sessions" }));
-			} else if(key === "device") {
-				this.ws.send(JSON.stringify({ action: "devices" }));
-			} else if (key === "app") {
-				this.ws.send(JSON.stringify({ action: "apps" }));
-			} else if (key === "platform") {
-				this.ws.send(JSON.stringify({ action: "platforms" }));
-			} else if (key === "library") {
-				this.ws.send(JSON.stringify({ action: "libraries" }));
+			// if (key === "session") {
+			// 	console.log("Footer(populateDropdown): Populating sessions");
+			// 	this.ws.send(JSON.stringify({ action: "sessions" }));
+			// } else if(key === "device") {
+			// 	console.log("Footer(populateDropdown): Populating devices");
+			// 	this.ws.send(JSON.stringify({ action: "devices" }));
+			// } else if (key === "app") {
+			// 	console.log("Footer(populateDropdown): Populating apps");
+			// 	this.ws.send(JSON.stringify({ action: "apps" }));
+			// } else if (key === "platform") {
+			// 	console.log("Footer(populateDropdown): Populating platforms");
+			// 	this.ws.send(JSON.stringify({ action: "platforms" }));
+			// } else if (key === "library") {
+			// 	console.log("Footer(populateDropdown): Populating libraries");
+			// 	this.ws.send(JSON.stringify({ action: "libraries" }));
+			// }
+		},
+		showConnectedApp() {
+			if(this.cs.getSelection.app.id) {
+				this.$router.push({ path: "/app", query: {...this.$route.query} });
+			} else {
+				this.$toast.add({ severity: 'warn', summary: 'Warning', detail: 'No app selected', life: 3000 });
 			}
 		},
 		async wsReady() {
 			console.log("Footer(wsReady): WebSocket ready");
-			this.didPageLoad = true;
-			const connectedApp = await this.currentSession.getConnectedApp();
-			console.log("Footer(wsReady): Connected app:", connectedApp);
-			this.currentSession.setAppConnectionPhase("loading");
-			this.ws.send(JSON.stringify({ action: "sessions" }));
-			this.ws.send(JSON.stringify({ action: "devices" }));
-			this.ws.send(JSON.stringify({ action: "libraries" }));
-			watch(() => this.currentSession.app.isDashboardReady, () => {
-				console.log("Footer(wsReady): Dashboard ready", this.currentSession.app.isDashboardReady);
-				this.$emit("dashboardUpdated", this.currentSession.app.isDashboardReady);
-			});
+			this.ws.send(JSON.stringify({ action: "dashboard.init" }));
+			await this.cs.syncConnectedApp();
 		},
 		async wsMessage(message) {
 			message = JSON.parse(message);
-			const t_query = this.$route.query;
 			console.log("Footer(wsMessage): Message:", message, message.action);
-			if (message.action == "sessionList") {
-				this.currentSession.app.sessions = message.sessions;
-				const t_sess = this.currentSession.app.sessions.find(session => session.id === this.currentSession.app.selectedSession.id);
-				this.currentSession.setSelectedSession(t_sess);
-				console.log("Footer(wsMessage): Sessions:", this.currentSession.app.sessions, "selected:", t_sess);
-				this.currentSession.setSessionActive(true);
-				this.$emit("sessionUpdated", t_sess);
-				this.currentSession.setDashboardPhase("sessions", true);
-				this.currentSession.checkDeviceReady();
-			} else if (message.action == "devices") {
-				this.currentSession.app.devices = message.devices;
-				if(this.currentSession.app.devices.length > 0) {
-					if(this.currentSession.app.connectedApp.status) {
-						console.log("Footer(wsMessage): Device selected from connected app", this.currentSession.app.connectedApp);
-						this.currentSession.setSelectedDevice(this.currentSession.app.devices.find(device => device.id === this.currentSession.app.connectedApp.app.deviceId));
-					} else if (t_query.device) {
-						console.log("Footer(wsMessage): Device selected from query", t_query.device);
-						this.currentSession.setSelectedDevice(this.currentSession.app.devices.find(device => device.id === t_query.device));
+			if (message.action == "dashboard.init.ack") {
+				this.cs.setData(message.data);
+				this.cs.setSelectionKey("session", message.data.activeSession);
+				this.cs.setStatus({ dashboardStatus: true });
+				if(message.data.activeSession && message.data.activeSession.id !== -1) {
+					this.cs.setStatusKey("sessionStatus", true);
+				}
+				if(this.cs.checkRequiredQueryParams(this.$route.query)) {
+					// console.log("Footer(wsMessage): Query params are present");
+					// console.log("Footer(wsMessage): Pre-Update Data:", this.cs.getSelection);
+					// console.log("Footer(wsMessage): Pre-Update Data:", this.cs.getData);
+					this.cs.updateSelectionUsingQueryParams(this.$route.query);
+					// console.log("Footer(wsMessage): Post-Update Data:", this.cs.getSelection);
+					// console.log("Footer(wsMessage): Post-Update Data:", this.cs.getData);
+					
+				} else if(message.data.devices.length > 0) {
+					// console.log("Footer(wsMessage): Query params are not present, Devices are present");
+					const t_device = message.data.devices[0];
+					this.cs.setSelectionKey("device", t_device);
+					const t_platform = t_device.platform;
+					this.cs.setSelectionKey("platform", t_platform);
+					let t_apps = [];
+					if(t_platform.toLowerCase() === "android") {
+						t_apps = t_device.users.filter(user => user.id == "0")[0].apps;
+						this.cs.setDataKey("users", t_device.users);
+						this.cs.setSelectionKey("user", t_device.users.filter(user => user.id == "0")[0]);
+					// 	console.log("Footer(wsMessage): Users:", t_device.users);
+					// 	console.log("Footer(wsMessage): User:", t_device.users.filter(user => user.id == "0")[0]);
 					} else {
-						console.log("Footer(wsMessage): Device selected from default - first", this.currentSession.app.devices[0]);
-						this.currentSession.setSelectedDevice(this.currentSession.app.devices[0]);
+						t_apps = t_device.users[0];
 					}
-					this.$emit("deviceUpdated", this.currentSession.app.selectedDevice);
-					this.currentSession.setDashboardPhase("devices", true);
-					this.currentSession.checkDeviceReady();
-					console.log("Footer(wsMessage): Devices:", this.currentSession.app.devices);
-					this.loadingDropdown.app = true;
-					this.ws.send(JSON.stringify({ action: "apps", deviceId: this.currentSession.app.selectedDevice.id }));
+					// console.log("Footer(wsMessage): Apps:", t_apps);
+					this.cs.setSelectionKey("apps", t_apps);
 				}
-			} else if (message.action == "apps") {
-				this.loadingDropdown.app = false;
-				this.currentSession.app.apps = message.apps;
-				this.$emit("appListUpdated", this.currentSession.app.apps);
-				console.log("Footer(wsMessage): Apps received:", message.apps.length);
-				if(this.currentSession.app.apps.length > 0) {
-					if(this.currentSession.app.connectedApp.status) {
-						console.log("Footer(wsMessage): App selected from connected app", this.currentSession.app.connectedApp);
-						this.currentSession.setSelectedApp(this.currentSession.app.apps.find(app => app.id === this.currentSession.app.connectedApp.app.identifier), true);
-						this.$emit("appUpdated", this.currentSession.app.selectedApp);
-					} else if (t_query.app) {
-						this.currentSession.setSelectedApp(this.currentSession.app.apps.find(app => app.id === t_query.app), true);
-						this.$emit("appUpdated", this.currentSession.app.selectedApp);
-						if(this.didPageLoad) {
-							this.startApp(t_query.app, "spawn");
-						}
-					}
-					this.currentSession.setDashboardPhase("apps", true);
-					this.currentSession.checkDeviceReady();
+				await this.cs.syncConnectedApp();
+				const t_connectedApp = this.cs.getConnectedApp;
+				if(t_connectedApp.status) {
+					console.log("Footer(wsMessage): Connected App is ready");
+					this.cs.setStatusKey("appStatus", true);
+				}
+				console.log("Footer(wsMessage): Dashboard ready", this.cs.getStatus.dashboardStatus);
+				this.$emit("dashboardReady", this.cs.getStatus.dashboardStatus);
+			} else if (message.action == "devices.init.ack") {
+				console.log("Footer(wsMessage): Devices ready", message.data);
+				this.cs.setDataKey("devices", message.data);
+			} else if (message.action === "error.general") {
+				console.log("Footer(wsMessage): Error", message.message);
+				this.$toast.add({ severity: 'error', summary: 'Error', detail: message.message, life: 3000 });
+			} else if (message.action === "apps.init.ack") {
+				console.log("Footer(wsMessage): Apps ready", message.data);
+				if(message.platform.toLowerCase() === "android") {
+					this.cs.setDataKey("users", message.data);
+					this.cs.setSelectionKey("user", message.data.filter(user => user.id == "0")[0]);
+					this.cs.setSelectionKey("apps", message.data.filter(user => user.id == "0")[0].apps);
 				} else {
-					console.log("Footer(wsMessage): No apps found");
+					this.cs.setDataKey("apps", message.data[0]);
+					this.cs.setDataKey("users", []);
 				}
-				console.log("Footer(wsMessage): Apps:", this.currentSession.app.apps);
-			} else if (message.action == "platforms") {
-				this.currentSession.app.platforms = message.platforms;
-				console.log("Footer(wsMessage): Platforms:", this.currentSession.app.platforms);
-			} else if (message.action == "libraries") {
-				this.currentSession.setDashboardPhase("libraries", true);
-				if (message.libraries.length > 0) {
-					this.currentSession.setLibraries(message.libraries);
-					console.log("Footer(wsMessage): Libraries:", message.libraries);
+			} else if (message.action === "error.general") {
+				console.log("Footer(wsMessage): Error", message.message);
+				this.$toast.add({ severity: 'error', summary: 'Error', detail: message.message, life: 3000 });
+			} else if (message.action === "error.json") {
+				console.log("Footer(wsMessage): Error", message.message);
+				for(let i = 0; i < message.message.length; i++) {
+					this.$toast.add({ severity: 'error', summary: 'Error', detail: message.message[i], life: 3000 });
 				}
-				if(this.currentSession.app.connectedApp.status) {
-					console.log("Footer(wsMessage): Library selected from connected app", this.currentSession.app.connectedApp.app.library);
-					this.currentSession.setSelectedLibrary(this.currentSession.app.connectedApp.app.library);
-					this.$emit("libraryUpdated", this.currentSession.app.selectedLibrary);
-				} else if(t_query.library) {
-					this.currentSession.setSelectedLibrary(t_query.library);
-					this.$emit("libraryUpdated", this.currentSession.app.selectedLibrary);
-				}
-			} else if (message.action == "deviceUpdate") {
-				console.log("Footer(wsMessage): Device updated:", message);
+			} else if (message.action === "general.ack") {
+				console.log("Footer(wsMessage): General ack", message.message);
+				this.$toast.add({ severity: 'success', summary: 'Info', detail: message.message, life: 3000 });
+			} else if (message.action === "device.update") {
+				console.log("Footer(wsMessage): Device update", message.message);
 				if(message.message === "Connected") {
-					this.$emit("appConnected", this.currentSession.app.selectedApp);
-					this.currentSession.setAppConnected(true);
-				} else if (message.message === "Disconnected") {
-					this.$emit("appDisconnected", this.currentSession.app.selectedApp);
-					this.currentSession.setAppConnected(false);
-					this.currentSession.setConnectedApp(null);
-				}
-				await this.currentSession.getConnectedApp()
-			} else if (message.action == "error") {
-				// if message.message is an object, loop through it and add each error message to the toast
-				if(typeof message.message === "object") {
-					for (const key in message.message) {
-						this.$toast.add({
-							snackbar: true,
-							severity: "error",
-							summary: "Error",
-							detail: message.message[key],
-							life: 3000
-						});
+					this.cs.setStatusKey("appStatus", true);
+					this.cs.setStatusKey("appConnectingStatus", false);
+					this.cs.syncConnectedApp();
+					this.$toast.add({ severity: 'success', summary: 'Device Update', detail: message.extra, life: 3000 });
+				} else if(message.message === "Disconnected") {
+					if(message.sessionId === this.cs.getSelection.sessionId) {
+						this.$toast.add({ severity: 'warn', summary: 'Device Update', detail: "'" + message.appName + "' app disconnected", life: 3000 });
+						// this.cs.setStatusKey("appStatus", false);
+						this.cs.resetSelectedApp();
+						console.log("Footer(wsMessage): Device disconnected, resetting app selection");
+					} else {
+						console.log("Footer(wsMessage): Device update for different session, ignoring. Existing sessionId:", this.cs.getSelection.sessionId, "Message sessionId:", message.sessionId);
 					}
-				} else {
-					this.$toast.add({
-						snackbar: true,
-						severity: "error",
-						summary: "Error",
-						detail: message.message,
-						life: 3000
-					});
 				}
-			} else if (message.action == "jsonError") {
-				this.$toast.add({
-					snackbar: true,
-					severity: "error",
-					summary: "Error",
-					detail: message.message.join("\n"),
-					life: 3000
-				});
-			}
-		},
-		startApp(packageName, action) {
-            this.isConnecting = true;
-            const library = this.currentSession.app.selectedLibrary !== null ? this.currentSession.app.selectedLibrary.file : null
-			this.$emit("appUpdated", this.currentSession.app.selectedApp);
-			// console.log("Starting app:", packageName, action);
-            // this.ws.send(JSON.stringify({
-            //     "action": action + "App",
-            //     "deviceId": this.currentSession.app.selectedDevice ? this.currentSession.app.selectedDevice.id : "",
-            //     "appId": packageName,
-            //     "appName": this.currentSession.app.selectedApp ? this.currentSession.app.selectedApp.name : "",
-            //     "library": library
-            // }))
-        },
-		showConnectedApp() {
-			if(Object.keys(this.$route.query).length === 0) {
-				// add app=com.appknox.mdm_test_app&device=192.168.0.105:5555&action=spawn&library=okhttp.js
-				this.$router.push({
-					path: "/app",
+			} else if (message.action === "app.connection") {
+				console.log("Footer(wsMessage): App connection", message.message);
+				this.cs.setStatusKey("appStatus", message.message);
+			} else if (message.action === "session.choose.ack") {
+				this.cs.setSelectionKey("session", message.session);
+				this.ws.send(JSON.stringify({ action: "traffic.init", sessionId: message.session.id }));
+				this.ws.send(JSON.stringify({ action: "repeater.init", sessionId: message.session.id }));
+			} else if (message.action === "library.change.ack") {
+				const t_lib = this.cs.getData.libraries.filter(lib => lib.file === message.library)[0];
+				this.cs.setSelectionKey("library", t_lib);
+				console.log("Footer(wsMessage): Library changed to", message.library, this.cs.getSelection);
+				this.$router.replace({
 					query: {
-						device: this.currentSession.app.selectedDevice ? this.currentSession.app.selectedDevice.id : null,
-						app: this.currentSession.app.selectedApp ? this.currentSession.app.selectedApp.id : null,
-						action: "spawn",
-						library: this.currentSession.app.selectedLibrary ? this.currentSession.app.selectedLibrary.file : null
+						...this.$route.query,
+						library: t_lib.file,
 					}
-				})
-			} else {
-				console.log("Query params present, redirecting to app");
-				this.$router.push({ path: "/app", query: this.$route.query })
+				});
 			}
 		},
 	},
@@ -634,9 +627,14 @@ circle {
     width: calc(100% - 52px);
 	display: flex;
 	align-items: center;
+    transition: all ease-in-out .4s;
 	flex-wrap: wrap; /* Allow groups to wrap */
 	gap: .3rem; /* Equivalent to gap-4 */
 	padding: 5px;
+}
+.status-indicator-wrapper.shrink {
+	width: calc(100% - 201px);
+	left: 201px;
 }
 
 /* Group for specific status sections */
@@ -801,4 +799,12 @@ circle {
 	}
 		
 }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin-svg {
+  animation: spin 2s linear infinite;
+}
+
 </style>

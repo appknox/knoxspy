@@ -1,12 +1,6 @@
 <template>
     <div class="page">
         <Toast />
-        <div class="page-loader" v-if="!isConnected">
-            <div>
-                <span><i class="pi pi-spinner pi-spin"></i></span>
-                <p>Connecting to app...</p>
-            </div>
-        </div>
         <div style="display: flex; align-items: center; border-bottom: 1px solid #eee; position: relative;">
             <SelectButton v-model="value" :options="options" @change="tabChanged($event)" :allow-empty="false" aria-labelledby="basic" style="position: absolute; left: 30px; top: 8px; z-index: 1000; text-align: center"/>
         </div>
@@ -113,7 +107,7 @@
             </Splitter>
             <Button :disabled='platformName == "1"' label="Replay" style="position: fixed; top: 7px; right: 10px;" icon="pi pi-send" @click="replayRequest"  v-shortkey="['meta', 'd']" @shortkey.native="replayRequest" />
         </div>
-        <Footer @sessionUpdated="updateSessionInfo" @deviceUpdated="updateDeviceInfo" @appUpdated="updateAppInfo" @libraryUpdated="updateLibraryInfo"></Footer>
+        <Footer @dashboardReady="dashboardReady"></Footer>
     </div>
 </template>
 
@@ -134,7 +128,7 @@ import TabPanel from 'primevue/tabpanel';
 import TabView from 'primevue/tabview';
 import ContextMenu from 'primevue/contextmenu';
 import SelectButton from 'primevue/selectbutton';
-import { useAppStore, useWebSocketStore, usePageReadyEmitter } from '../stores/session';
+import { useAppStore, useWebSocketStore } from '../stores/session';
 import Listbox from 'primevue/listbox';
 import { Codemirror } from 'vue-codemirror'
 import TabMenu from 'primevue/tabmenu';
@@ -151,6 +145,8 @@ import hljs from 'highlight.js/lib/core';
 import langHTTP from 'highlight.js/lib/languages/http';
 import Footer from '../components/Footer.vue';
 import { httpStatusCodes } from '../constants';
+import ScrollPanel from 'primevue/scrollpanel';
+import { throwDeprecation } from 'process';
 
 hljs.registerLanguage('http', langHTTP);
 
@@ -213,9 +209,8 @@ export default defineComponent({
             repeaterRequestViewer: null,
             repeaterResponseViewer: null,
             repeaterRightClickSelectedTab: null,
-            currentSession: useAppStore(),
+            cs: useAppStore(),
             ws: useWebSocketStore(),
-            emitter: usePageReadyEmitter(),
             deviceId: this.$route.params.device_id as string,
             packageName: this.$route.params.package_name as string,
             library: this.$route.params.library as string,
@@ -225,6 +220,7 @@ export default defineComponent({
         };
     },
     components: {
+        ScrollPanel,
         Toast,
         Toolbar,
         ConfirmPopup,
@@ -246,24 +242,21 @@ export default defineComponent({
         ContextMenu,
         Listbox,
         Codemirror,
-        Footer
+        Footer,
     },
     created() {
-        this.ws.addOnOpenHandler(this.wsReady)
         this.ws.addOnMessageHandler(this.wsMessage)
     },
     methods: {
-        wsReady() {
-            console.log("Needs setup", this.didPageLoad);
-            const connectedApp = this.currentSession.getConnectedApp;
-            console.log("Connected app:", connectedApp);
-            if(connectedApp) {
-                this.isConnected = true;
+        dashboardReady(isReady: boolean) {
+            if (isReady) {
+                this.ws.send(JSON.stringify({action: "traffic.init", session: this.cs.getSelection.session.id}))
+                this.ws.send(JSON.stringify({action: "repeater.init", session: this.cs.getSelection.session.id}));
             }
         },
         wsMessage(message: any) {
             message = JSON.parse(message);
-            if (message.action === 'trafficUpdate') {
+            if (message.action === 'traffic.update.ack') {
                 let t_row = message.message;
                 t_row["length"] = t_row["response_body"].length;
                 const t_headers = JSON.parse(t_row["response_headers"]);
@@ -275,11 +268,11 @@ export default defineComponent({
                     t_row["content_type"] = t_content_type;
                 }
                 this.rows.push(t_row);
-            } else if (message.action === 'repeaterUpdate') {
+            } else if (message.action === 'repeater.add.ack') {
                 let data = JSON.parse(message.traffic);
                 this.addRowsToRepeater([data], false);
                 console.log("New repeater tab added");
-            } else if (message.action === 'trafficInit') {
+            } else if (message.action === 'traffic.init.ack') {
                 let data = JSON.parse(message.message);
                 data.forEach((element: any) => {
                     element.length = element.response_body.length;
@@ -292,10 +285,11 @@ export default defineComponent({
                     }
                 });
                 this.rows = data;
-            } else if (message.action === 'repeaterInit') {
+            } else if (message.action === 'repeater.init.ack') {
+                console.log("Repeater init ack received", message.message);
                 let data = JSON.parse(message.message);
                 this.addRowsToRepeater(data, true);
-            } else if (message.action === 'replayUpdate') {
+            } else if (message.action === 'repeater.replay.ack') {
                 let data = JSON.parse(message.replay);
                 var tmpJSONFlag = false;
                 let t_request_headers = JSON.parse(data.request_headers);
@@ -356,9 +350,9 @@ export default defineComponent({
                 this.activeRepeaterData = tmpUpdatedRequest;
                 var index = this.repeaterRows.findIndex(obj => obj.id === data.id)
                 this.repeaterRows[index] = tmpUpdatedRequest 
-            } else if (message.action === 'changeLibrary') {
-                this.currentSession.app.selectedLibrary = message.library;
-            } else if (message.action === "repeaterTabDeleted") {
+            } else if (message.action === 'library.update.ack') {
+                this.cs.setSelectionKey("library", message.library);
+            } else if (message.action === "repeater.delete.ack") {
                 const t_repeater_id = message.id;
                 this.repeaterRows = this.repeaterRows.filter((obj: any) => obj.id !== t_repeater_id);
                 if(this.repeaterRows.length === 0) {
@@ -371,38 +365,10 @@ export default defineComponent({
                 }
             }
         },
-        setupPage(emitter: any = null) {
-            console.log("HTTPTraffic: page setup", emitter);
-            this.isConnected = true;
-        
-            console.log(this.deviceId, this.packageName, this.action, this.library);
-            
-            // if(this.deviceId && this.packageName && this.action && this.library) {
-            //     console.log("All parameters present");
-            //     const t_device_id = atob(this.deviceId);
-            //     this.ws.send(JSON.stringify({"action": "findApp", "deviceId": t_device_id, "packageName": this.packageName}));
-            // } else if(this.deviceId && this.packageName && this.action) {
-            //     console.log("No library");
-            //     const t_device_id = atob(this.deviceId);
-            //     this.ws.send(JSON.stringify({"action": "findApp", "deviceId": t_device_id, "packageName": this.packageName}));
-            // } else {
-            //     console.log("No params");
-            //     this.isConnected = true;
-            //     this.$toast.add({
-            //         severity: 'error',
-            //         summary: 'Error',
-            //         detail: 'No device selected',
-            //         life: 3000
-            //     });
-            //     this.$toast.add({
-            //         severity: 'error',
-            //         summary: 'Error',
-            //         detail: 'No app selected',
-            //         life: 3000
-            //     });
-            // }
-        },
         addRowsToRepeater(rows: any[], isInit: boolean = false) {
+            if(isInit) {
+                this.repeaterRows = [];
+            }
             rows.forEach((element: any) => {
                 var tmpData = element.method + " " + element.endpoint + " HTTP/1.1\n"
                 // console.log(element);
@@ -474,19 +440,6 @@ export default defineComponent({
                 this.value = 'Repeater'
             }
         },
-        startApp(packageName: string, action: string) {
-            let t_library = this.library;
-            if(this.library) {
-                t_library = atob(this.library)
-            }
-            this.ws.send(JSON.stringify({
-                "action": action + "App",
-                "deviceId": this.currentSession.app.selectedDevice.id,
-                "appId": packageName,
-                "appName": this.currentSession.app.selectedApp.name,
-                "library": t_library
-            }))
-        },
         tabChanged(event: any) {
             // console.log(event);
             if(event.value === "Repeater" && this.repeaterRows.length === 0) {
@@ -499,7 +452,7 @@ export default defineComponent({
         },
         removeTab(event: any, item: any) {
             console.log("Removing", event, item);
-            this.ws.send(JSON.stringify({'action': 'deleteRepeaterTab', 'id': this.activeRepeaterData.id}))
+            this.ws.send(JSON.stringify({'action': 'repeater.delete', 'id': this.activeRepeaterData.id}))
         },
         showTemplate(event: any) {
             this.$confirm.require({
@@ -554,8 +507,9 @@ export default defineComponent({
             return parsedRequest;
         },
         replayRequest() {
-            if(!this.currentSession.app.connectedApp.status) {
-                console.log("No app connected");
+            if(!this.cs.getConnectedApp.status || !this.cs.getStatus.appStatus) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'App is not connected!', life: 3000 });
+                return;
             } else {
                 let t_replayPayload = {
                     "id": "",
@@ -584,7 +538,7 @@ export default defineComponent({
                 t_replayPayload['response_headers'] = ""
                 t_replayPayload['session_id'] = tmpRepeaterData.session_id
                 console.log("Replay payload", t_replayPayload);
-                this.ws.send(JSON.stringify({'action': 'replayRequest', 'replay': t_replayPayload, 'platform': this.currentSession.app.selectedDevice.platform}))
+                this.ws.send(JSON.stringify({'action': 'repeater.replay', 'replay': t_replayPayload, 'platform': this.cs.getSelection.platform}))
             }
         },
         changeRepeater(event: any) {
@@ -601,14 +555,11 @@ export default defineComponent({
         sendToRepeater(row: any, duplicate: any = false) {
             if(!duplicate) {
                 console.log(row.id);
-                // this.value = 'Repeater'
-                this.ws.send(JSON.stringify({'action': 'sendToRepeater', 'id': row.id}))
+                this.ws.send(JSON.stringify({'action': 'repeater.add', 'id': row.id}))
             } else {
-
                 console.log(this.repeaterRightClickSelectedTab.id);
-                this.ws.send(JSON.stringify({'action': 'duplicateRepeater', 'id': this.repeaterRightClickSelectedTab.id}))
+                this.ws.send(JSON.stringify({'action': 'repeater.duplicate', 'id': this.repeaterRightClickSelectedTab.id}))
             }
-            
         },
         editRepeaterTabTitle(event: any, item: any) {
             console.log("Event", event, item, this.activeRepeaterData);
@@ -620,8 +571,7 @@ export default defineComponent({
             }
         },
         setRepeaterTabTitle(event: any) {
-            console.log("Event", this.repeaterTabTitleConfirmInput, this.activeRepeaterData);
-            this.connection.send(JSON.stringify({'action': 'setRepeaterTabTitle', 'title': this.repeaterTabTitleConfirmInput, 'id': this.activeRepeaterData.id}))
+            this.ws.send(JSON.stringify({'action': 'repeater.tab.update', 'title': this.repeaterTabTitleConfirmInput, 'id': this.activeRepeaterData.id}))
             var index = this.repeaterRows.findIndex(obj => obj.id === this.activeRepeaterData.id)
             console.log("Updated Tab:", this.repeaterRows[index]);
             
@@ -677,43 +627,23 @@ export default defineComponent({
             // console.log(typeof(av), typeof(bv));
             //  return av == bv ? 0 : av > bv ?  1 : -1;
         },
-        updateSessionInfo(session: any) {
-            console.log("Current path", this.$route.fullPath, "session");
-        },
-        updateDeviceInfo(device: any) {
-            console.log("Current path", this.$route.fullPath, "device");
-            this.updateURL(device.id, "device")
-        },
-        updateAppInfo(app: any) {
-            console.log("Current path", this.$route.fullPath, "app");
-            this.updateURL(app.id, "app")
-        },
-        updateLibraryInfo(library: any) {
-            console.log("Current path", this.$route.fullPath, "library");
-            this.updateURL(library.file, "library")
-        },
-        updateURL(value: any, key: string) {
-            this.$router.push({path: "/traffic", query: {
-                ...this.$route.query,
-                [key]: value
-            }})
-        },
     },
     mounted() {
         console.log("HTTPTraffic: Page mounted");
-        this.isConnected = true;
-        this.ws.send(JSON.stringify({action: "getTraffic", session: this.currentSession.app.selectedSession.id}))
+        if(this.ws) {
+            this.ws.send(JSON.stringify({ action: "traffic.init", session: this.cs.getSelection.session.id }));
+            this.ws.send(JSON.stringify({ action: "repeater.init", session: this.cs.getSelection.session.id }));
+        }
+
         const grid = document.querySelector('revo-grid');
         if (grid) {
             grid.resize = true;
             grid.autoSizeColumn = true;
         }
-        // this.setupEditor()
     },
 	unmounted() {
 		console.log("Unmounting HTTPTraffic");
 		this.ws.removeMessageCallback(this.wsMessage);
-		this.ws.removeOpenCallback(this.wsReady);
 	},
 });
 </script>
