@@ -23,8 +23,11 @@ Traditional proxy tools like **Burp Suite** fail when dealing with:
 - 🔒 **Certificate pinning** implementations
 - 🛡️ **Custom security protocols**
 - 🔐 **TLS/SSL bypass restrictions**
+- 🌐 **Devices using VPN connections**
 
-**KnoxSpy** solves this by hooking directly into popular network libraries at **runtime**, intercepting traffic **before encryption** and **after decryption**.
+
+
+**KnoxSpy** solves this by hooking directly into popular network libraries at **runtime**, even when the API traffic is routed through a VPN.
 
 ---
 
@@ -33,20 +36,15 @@ Traditional proxy tools like **Burp Suite** fail when dealing with:
 ### 🔥 **Advanced Interception**
 - **Runtime Hooking**: Bypass certificate pinning and security restrictions
 - **Multi-Platform**: Android (OkHttp3) and iOS (Alamofire/AFNetworking) support
-- **Auto-Detection**: Automatically detects and hooks appropriate network libraries
 - **Real-Time Analysis**: Live traffic capture and analysis
 
 ### 🛠️ **Professional Toolkit**
-- **Request Modification**: Edit requests on-the-fly
 - **Traffic Replay**: Replay captured requests for testing
-- **Endpoint Fuzzing**: Built-in brute force capabilities
 - **Session Management**: Multiple concurrent testing sessions
 
 ### 🎨 **Modern Interface**
 - **Vue.js Frontend**: Responsive, intuitive web interface
 - **WebSocket Integration**: Real-time updates and communication
-- **Dark Theme**: Eye-friendly interface for extended testing sessions
-- **Export Capabilities**: Save and share your findings
 
 ---
 
@@ -81,6 +79,8 @@ Traditional proxy tools like **Burp Suite** fail when dealing with:
 - **Node.js** 18+ for development
 - **Android/iOS** device with USB debugging enabled
 
+> **Note:** Android device has to be rooted
+
 ### 🚀 **Installation**
 
 ```bash
@@ -104,7 +104,7 @@ cd ../..
 3. **Access Interface**: Open http://localhost:5173 in your browser
 4. **Create Session**: Set up a new testing session
 5. **Select App**: Choose the target application from the device
-6. **Auto-Hook**: Let KnoxSpy detect and hook the network library
+6. **Select Library**: Choose the library being used by the application
 7. **Capture Traffic**: Switch to the Proxy tab and start intercepting
 
 ---
