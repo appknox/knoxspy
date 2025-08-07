@@ -90,6 +90,9 @@ export default defineComponent({
         this.ws.addOnMessageHandler(this.wsMessage)
     },
     mounted() {
+        if(this.ws.isConnected) {
+            this.sessionsLoaded = true;
+        }
     },
     methods: {
         wsReady() {

@@ -38,6 +38,7 @@ export interface SessionInfo {
   app: App | null;
   status: boolean;
   channel: any | null;
+  dashboard_data?: any;
 }
 
 export interface User {
@@ -64,4 +65,14 @@ export interface AndroidUsersInfo {
   id: string;
   name: string;
   apps: AppsDetails[];
+}
+
+export interface DashboardQueryParams {
+  sessionId?: string;
+  device?: string;
+  user?: string | "-1";
+  app?: string;
+  platform?: string;
+  library?: string | "";
+  action?: string | "spawn";
 }

@@ -5,7 +5,7 @@
             <SelectButton v-model="value" :options="options" @change="tabChanged($event)" :allow-empty="false" aria-labelledby="basic" style="position: absolute; left: 30px; top: 8px; z-index: 1000; text-align: center"/>
         </div>
 
-        <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 30px)" layout="vertical" v-on:resize="resizedSplitter">
+        <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 50px)" layout="vertical" v-on:resize="resizedSplitter">
             <SplitterPanel class="flex align-items-center justify-content-center" :size="60">
                 <ContextMenu ref="cm" :model="menuModel" />
                 <DataTable style="" contextMenu v-model:contextMenuSelection="selectedRow" @rowContextmenu="onRowContextMenu" selectionMode="single" @rowSelect="onRequestSelect" dataKey="id" class="traffic-history" :filters="filters" sortField="id" :sortOrder="-1" :value="rows" scrollable v-bind:scroll-height="dataTableHeight" tableStyle="min-width: 50rem" :globalFilterFields="['host', 'url']" size="small">
@@ -23,7 +23,7 @@
                     <Column field="protocol" header="Protocol" sortable style="width: 50px; font-size: 13px"></Column>
                     <Column field="host" header="Host" sortable style="width: 200px; font-size: 13px"></Column>
                     <Column field="endpoint" header="Endpoint" sortable style="width: 300px; font-size: 13px"></Column>
-                    <Column field="content_type" header="Content Type" sortable style="width: 150px; font-size: 13px"></Column>
+                    <Column field="content_type" header="Content Type" sortable style="width: 170px; font-size: 13px"></Column>
                     <Column field="status_code" header="Status" sortable style="width: 100px; font-size: 13px"></Column>
                     <Column field="length" header="Length" sortable style="width: 70px; font-size: 13px"></Column>
                 </DataTable>
@@ -84,7 +84,7 @@
                     <codemirror
                         v-model="activeRepeaterData.requestContent"
                         placeholder="Code goes here..."
-                        style="width: calc(100% - 10px);height: calc(100vh - 90px); border: 0; margin: 5px;  background-color: var(--surface-100)"
+                        style="width: calc(100% - 10px);height: calc(100vh - 105px); border: 0; margin: 5px;  background-color: var(--surface-100); font-size: 13px"
                         :autofocus="true"
                         :extensions="codeMirrorOptions.extensions"
                         :indent-with-tab="true"
@@ -94,7 +94,7 @@
                 <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
                     <codemirror
                         v-model="activeRepeaterData.responseContent"
-                        style="width: calc(100% - 10px); height: calc(100vh - 90px); border: 0; margin: 5px; background-color: var(--surface-100)"
+                        style="width: calc(100% - 10px); height: calc(100vh - 105px); border: 0; margin: 5px; background-color: var(--surface-100); font-size: 13px"
                         :autofocus="true"
                         :indent-with-tab="true"
                         :tab-size="2"
@@ -265,7 +265,7 @@ export default defineComponent({
                 t_row["content_type"] = "";
                 if (t_content_type && t_content_type !== "") {
                     t_content_type = t_content_type.split(":")[1].trim();
-                    t_row["content_type"] = t_content_type;
+                    t_row["content_type"] = t_content_type.replace("; charset=utf-8", "");
                 }
                 this.rows.push(t_row);
             } else if (message.action === 'repeater.add.ack') {
@@ -281,7 +281,7 @@ export default defineComponent({
                     element.content_type = "";
                     if (t_content_type && t_content_type !== "") {
                         t_content_type = t_content_type.split(":")[1].trim();
-                        element.content_type = t_content_type;
+                        element.content_type = t_content_type.replace("; charset=utf-8", "");
                     }
                 });
                 this.rows = data;
@@ -291,6 +291,13 @@ export default defineComponent({
                 this.addRowsToRepeater(data, true);
             } else if (message.action === 'repeater.replay.ack') {
                 let data = JSON.parse(message.replay);
+                const t_requestHeaders = JSON.parse(data.request_headers)
+                const t_responseHeaders = JSON.parse(data.response_headers)
+                const t_responseStatus = t_responseHeaders[0].split(" ")[0]
+                let t_httpVersion = "HTTP/1.1";
+                if(t_responseStatus === "H2") {
+                    t_httpVersion = "HTTP/2"
+                }
                 var tmpJSONFlag = false;
                 let t_request_headers = JSON.parse(data.request_headers);
                 t_request_headers.forEach((ele: any) => {
@@ -301,7 +308,7 @@ export default defineComponent({
                     }
                 })
                 
-                var tmpData = data.method + " " + data.endpoint + " HTTP/1.1\n"
+                var tmpData = data.method + " " + data.endpoint + " " + t_httpVersion + "\n"
                 tmpData += t_request_headers.join("\n")
                 // tmpData += "\nHost: " + element.host
                 // console.log(element);
@@ -330,14 +337,14 @@ export default defineComponent({
                             newJSONFlag = true;
                         }
                     }
-                    if(ele.toLowerCase().startsWith("http/")) {
+                    if(ele.toLowerCase().startsWith("http/") || ele.toLowerCase().startsWith("h2")) {
                         isHTTPResponseHeaderPresent = true;
                     }
                 })
                 console.log("New flag value: ", newJSONFlag)
                 console.log("HTTP response header present: ", isHTTPResponseHeaderPresent, "Status:", data.status_code)
                 if(!isHTTPResponseHeaderPresent) {
-                    tmpData = "HTTP/1.1 " + data.status_code + " " + httpStatusCodes[data.status_code] + "\n" + tmpData;
+                    tmpData = t_httpVersion + " " + data.status_code + " " + httpStatusCodes[data.status_code] + "\n" + tmpData;
                 }
                 if(newJSONFlag) {
                     tmpData += "\n\n" + JSON.stringify(JSON.parse(data.response_body), null, 2);
@@ -370,7 +377,15 @@ export default defineComponent({
                 this.repeaterRows = [];
             }
             rows.forEach((element: any) => {
-                var tmpData = element.method + " " + element.endpoint + " HTTP/1.1\n"
+                const t_requestHeaders = JSON.parse(element.request_headers)
+                const t_responseHeaders = JSON.parse(element.response_headers)
+                const t_responseStatus = t_responseHeaders[0].split(" ")[0]
+                let t_httpVersion = "HTTP/1.1";
+                if(t_responseStatus === "H2") {
+                    t_httpVersion = "HTTP/2"
+                }
+
+                var tmpData = element.method + " " + element.endpoint + " " + t_httpVersion + "\n"
                 // console.log(element);
                 var tmpJSONFlag = false;
                 JSON.parse(element.request_headers).forEach((ele: any) => {
@@ -412,7 +427,7 @@ export default defineComponent({
                             tmpJSONFlag = true;
                         }
                     }
-                    if (ele.toLowerCase().startsWith("http/")) {
+                    if (ele.toLowerCase().startsWith("http/") || ele.toLowerCase().startsWith("h2")) {
                         isHTTPResponseHeaderPresent = true;
                     }
                 })
@@ -599,8 +614,18 @@ export default defineComponent({
             this.visibleTrafficHeader = !this.visibleTrafficHeader
         },
         onRequestSelect(event: any) {
-            var tmpData = event.data.method + " " + event.data.endpoint + " HTTP/1.1\n"
-            tmpData += JSON.parse(event.data.request_headers).join("\n")
+            const t_requestHeaders = JSON.parse(event.data.request_headers)
+            const t_responseHeaders = JSON.parse(event.data.response_headers)
+
+            const t_responseStatus = t_responseHeaders[0].split(" ")[0]
+            console.log("Response status:", t_responseStatus);
+            let t_httpVersion = "HTTP/1.1";
+            if(t_responseStatus === "H2") {
+                t_httpVersion = "HTTP/2"
+            }
+
+            var tmpData = event.data.method + " " + event.data.endpoint + " " + t_httpVersion + "\n"
+            tmpData += t_requestHeaders.join("\n")
             console.log(event.data);
             console.log(event.data.request_body);
             if(event.data.request_body) {
@@ -612,7 +637,7 @@ export default defineComponent({
             console.log("Response headers:", event.data.response_headers);
             
             this.requestContent = tmpData
-            tmpData = JSON.parse(event.data.response_headers).join("\n")
+            tmpData = t_responseHeaders.join("\n")
             tmpData += "\n\n" + event.data.response_body
             
             this.responseContent = tmpData
@@ -630,6 +655,12 @@ export default defineComponent({
     },
     mounted() {
         console.log("HTTPTraffic: Page mounted");
+        if(!this.cs.getStatus.sessionStatus) {
+            this.$toast.add({ severity: 'error', summary: 'Error', detail: 'No session selected!', life: 3000 });
+            this.$router.push({ path: "/" });
+            return;
+        }
+
         if(this.ws) {
             this.ws.send(JSON.stringify({ action: "traffic.init", session: this.cs.getSelection.session.id }));
             this.ws.send(JSON.stringify({ action: "repeater.init", session: this.cs.getSelection.session.id }));

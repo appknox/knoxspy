@@ -24,6 +24,7 @@ export interface DashboardStatus {
 	dashboardStatus: boolean;
 	sidebarStatus: boolean;
 	appConnectingStatus: boolean;
+	appConnectionTime: number;
 }
 
 export interface ConnectedApp {

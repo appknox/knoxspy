@@ -153,8 +153,8 @@ export default defineComponent({
                 console.log("Footer(wsMessage): Apps ready", message.data);
 				if(message.platform.toLowerCase() === "android") {
 					this.cs.setDataKey("users", message.data);
-					this.cs.setSelectionKey("user", message.data.filter(user => user.id == "0")[0]);
-					this.cs.setSelectionKey("apps", message.data.filter(user => user.id == "0")[0].apps);
+					this.cs.setSelectionKey("user", message.data.filter((user: any) => user.id == "0")[0]);
+					this.cs.setSelectionKey("apps", message.data.filter((user: any) => user.id == "0")[0].apps);
 				} else {
 					this.cs.setDataKey("apps", message.data[0]);
 					this.cs.setDataKey("users", []);
@@ -163,6 +163,7 @@ export default defineComponent({
             } else if(message.action === "devices.refresh.ack") {
 				console.log("Footer(wsMessage): Devices ready", message.data);
 				this.cs.setDataKey("devices", message.data);
+                this.cs.setDefaultDevice();
                 this.refreshingDevices = false;
             }
         },

@@ -13,8 +13,16 @@
 						</svg>
 					</div>
 					<div class="status-text">	
-						<span><b style="color: #ddd">Server:</b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ ws.isConnected ? 'Connected' : 'Connecting..' }}</span>
+						<span><b style="color: #ddd">Server</b></span>
+						<!-- <span>{{ ws.isConnected ? 'Conn.' : 'Connecting..' }}</span> -->
+						<span>
+							<svg v-if="ws.isConnected" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#fff" class="bi bi-check2" viewBox="0 0 16 16">
+								<path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0"/>
+							</svg>
+							<svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#fff" class="bi bi-x" viewBox="0 0 16 16">
+								<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>
+							</svg>
+						</span>
 					</div>
 				</div>
 			</div>
@@ -26,8 +34,16 @@
 						</svg>
 					</div>
 					<div class="status-text" @click="showConnectedApp()">	
-						<span><b style="color: #ddd">App:</b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getStatus.appStatus ? 'Connected' : 'Not Connected' }}</span>
+						<span><b style="color: #ddd">App</b></span>
+						<!-- <span>{{ cs.getStatus.appStatus ? 'Conn.' : 'Not Conn.' }}</span> -->
+						<span>
+							<svg v-if="cs.getStatus.appStatus" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#fff" class="bi bi-check2" viewBox="0 0 16 16">
+								<path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0"/>
+							</svg>
+							<svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="#fff" class="bi bi-x" viewBox="0 0 16 16">
+								<path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708"/>
+							</svg>
+						</span>
 					</div>
 				</div>
 			</div>
@@ -45,7 +61,7 @@
 					</div>
 					<div class="status-text">	
 						<span><b style="color: #ccc">Session: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getStatus.sessionStatus ? (cs.getSelection.session.name ? cs.getSelection.session.name : 'No session selected') : 'No session selected' }}</span>
+						<span>{{ cs.getStatus.sessionStatus ? (cs.getSelection.session.name ? cs.getSelection.session.name : '-') : '-' }}</span>
 					</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -70,7 +86,7 @@
 					</div>
 					<div class="status-text">	
 						<span><b style="color: #ccc">Device: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.device ? cs.getSelection.device.name : 'No device selected' }}</span>
+						<span>{{ cs.getSelection.device ? cs.getSelection.device.name : '-' }}</span>
 					</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -95,7 +111,7 @@
 					</div>
 					<div class="status-text">
 						<span><b style="color: #ccc">App: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.app.name ? cs.getSelection.app.name : 'No app selected' }}</span>
+						<span style="">{{ cs.getSelection.app.name ? cs.getSelection.app.name : '-' }}</span>
 					</div>
 					<div class="status-arrow" style="display: none">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -120,7 +136,7 @@
 					</div>
 					<div class="status-text">
 						<span ><b style="color: #ccc">Platform: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.platform ? cs.getSelection.platform : 'No platform' }}</span>
+						<span>{{ cs.getSelection.platform ? cs.getSelection.platform : '-' }}</span>
 					</div>
 				</div>
 			</div>
@@ -133,7 +149,7 @@
 					</div>
 					<div class="status-text">
 						<span ><b style="color: #ccc">Library: </b></span>
-						<span style="background-color: #0004; border-radius: 9999px; padding: 5px 20px;">{{ cs.getSelection.library.file ? cs.getSelection.library.file : 'No library selected' }}</span>
+						<span>{{ cs.getSelection.library.file ? cs.getSelection.library.file : '-' }}</span>
 					</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
@@ -261,8 +277,18 @@ export default defineComponent({
 			// 	this.ws.send(JSON.stringify({ action: "libraries" }));
 			// }
 		},
-		showConnectedApp() {
+		async showConnectedApp() {
+			console.log("Footer(showConnectedApp): Data:", this.cs.getData);
+			console.log("Footer(showConnectedApp): Selection:", this.cs.getSelection);
+			
+			await this.cs.syncConnectedApp();
+			if(this.cs.getConnectedApp.status) {
+				console.log("Footer(showConnectedApp): App is connected, but no app is selected");
+				this.cs.setSelectionKey("app", this.cs.getConnectedApp.app);
+				this.$router.push({ path: "/app", query: {...this.$route.query} });
+			}
 			if(this.cs.getSelection.app.id) {
+				console.log("Footer(showConnectedApp): App is selected, navigating to app page");
 				this.$router.push({ path: "/app", query: {...this.$route.query} });
 			} else {
 				this.$toast.add({ severity: 'warn', summary: 'Warning', detail: 'No app selected', life: 3000 });
@@ -284,31 +310,29 @@ export default defineComponent({
 					this.cs.setStatusKey("sessionStatus", true);
 				}
 				if(this.cs.checkRequiredQueryParams(this.$route.query)) {
-					// console.log("Footer(wsMessage): Query params are present");
-					// console.log("Footer(wsMessage): Pre-Update Data:", this.cs.getSelection);
-					// console.log("Footer(wsMessage): Pre-Update Data:", this.cs.getData);
-					this.cs.updateSelectionUsingQueryParams(this.$route.query);
-					// console.log("Footer(wsMessage): Post-Update Data:", this.cs.getSelection);
-					// console.log("Footer(wsMessage): Post-Update Data:", this.cs.getData);
-					
-				} else if(message.data.devices.length > 0) {
-					// console.log("Footer(wsMessage): Query params are not present, Devices are present");
-					const t_device = message.data.devices[0];
-					this.cs.setSelectionKey("device", t_device);
-					const t_platform = t_device.platform;
-					this.cs.setSelectionKey("platform", t_platform);
-					let t_apps = [];
-					if(t_platform.toLowerCase() === "android") {
-						t_apps = t_device.users.filter(user => user.id == "0")[0].apps;
-						this.cs.setDataKey("users", t_device.users);
-						this.cs.setSelectionKey("user", t_device.users.filter(user => user.id == "0")[0]);
-					// 	console.log("Footer(wsMessage): Users:", t_device.users);
-					// 	console.log("Footer(wsMessage): User:", t_device.users.filter(user => user.id == "0")[0]);
-					} else {
-						t_apps = t_device.users[0];
+					console.log("Footer(wsMessage): Query params are present");
+					const t_result = this.cs.updateSelectionUsingQueryParams(this.$route.query);
+					if(!t_result) {
+						this.$router.push({ path: "/apps" })
 					}
-					// console.log("Footer(wsMessage): Apps:", t_apps);
-					this.cs.setSelectionKey("apps", t_apps);
+				} else if (this.cs.getConnectedApp.status) {
+					console.log("Footer(wsMessage): Query params are not present, syncing from server");
+					await this.cs.syncBackSelection(() => {
+						this.$router.replace({
+							query: {
+								...this.$route.query,
+								platform: this.cs.getSelection.platform,
+								user: this.cs.getSelection.user.id || -1,
+								device: this.cs.getSelection.device.id,
+								app: this.cs.getSelection.app.id,
+								library: this.cs.getSelection.library.file,
+								action: this.cs.getSelection.action || "spawn"
+							}
+						})
+					});
+				} else if(message.data.devices.length > 0) {
+					console.log("Footer(wsMessage): No query params, setting default device");
+					this.cs.setDefaultDevice();
 				}
 				await this.cs.syncConnectedApp();
 				const t_connectedApp = this.cs.getConnectedApp;
@@ -350,8 +374,10 @@ export default defineComponent({
 				if(message.message === "Connected") {
 					this.cs.setStatusKey("appStatus", true);
 					this.cs.setStatusKey("appConnectingStatus", false);
+					this.cs.stopAppConnectionTimer();
 					this.cs.syncConnectedApp();
 					this.$toast.add({ severity: 'success', summary: 'Device Update', detail: message.extra, life: 3000 });
+					// this.ws.send(JSON.stringify({ action: "dashboard.update", selection: this.cs.getSelection }));
 				} else if(message.message === "Disconnected") {
 					if(message.sessionId === this.cs.getSelection.sessionId) {
 						this.$toast.add({ severity: 'warn', summary: 'Device Update', detail: "'" + message.appName + "' app disconnected", life: 3000 });
@@ -628,7 +654,7 @@ circle {
 	display: flex;
 	align-items: center;
     transition: all ease-in-out .4s;
-	flex-wrap: wrap; /* Allow groups to wrap */
+	flex-wrap: nowrap; /* Allow groups to wrap */
 	gap: .3rem; /* Equivalent to gap-4 */
 	padding: 5px;
 }
@@ -642,7 +668,7 @@ circle {
 	display: flex;
 	align-items: center;
 	flex-wrap: nowrap; /* Prevent items within a group from wrapping */
-	gap: .1rem; /* Equivalent to gap-3 */
+	gap: .7rem; /* Equivalent to gap-3 */
 	position: relative;
 }
 
@@ -653,6 +679,11 @@ circle {
 	gap: 0.375rem; /* Equivalent to gap-1.5 */
 	position: relative; /* For tooltip */
 	white-space: nowrap; /* Prevent text wrapping within item */
+	flex: 1 1 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 .status-item:hover {
 	cursor: pointer;
@@ -663,10 +694,10 @@ circle {
 }
 
 .status-group-left .status-item {
-	padding: 0 10px;
+	padding: 0 0px;
 }
 .status-group-right {
-	gap: 30px;
+	gap: 15px;
 }
 .status-group-right .status-item span {
 	flex-grow: 1;
@@ -695,6 +726,12 @@ circle {
 	padding: 3px;
 	display: flex;
 	flex-grow: 1;
+
+	flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .status-icon {
@@ -709,10 +746,27 @@ circle {
 .status-text {
 	display: flex;
 	flex-grow: 1;
+	flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .status-text span:nth-of-type(1) {
 	flex-grow: unset;
 	padding-left: 5px;
+}
+.status-text span:nth-of-type(2) {
+	overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+	background-color: #0004;
+	border-radius: 9999px;
+	padding: 5px 13px 5px 5px;
+}
+.status-group-left .status-text span:nth-of-type(2) {
+	padding: 5px;
+	flex-grow: 1;
 }
 .status-text::after {
 	display: block;
@@ -762,6 +816,31 @@ circle {
 	background-color: #d1d5db; /* Equivalent to bg-gray-300 */
 	margin: 0 0.5rem; /* Equivalent to mx-2 */
 }
+.status-group-left .status-item {
+	flex: unset;
+}
+
+.status-group-left .status-text {
+	justify-content: space-between;
+    align-items: anchor-center;
+    padding: 0px;
+}
+
+.status-group-left .status-text span:nth-of-type(1) {
+	padding: 0 5px;
+}
+.status-group-left .status-text span:nth-of-type(2) {
+	flex-grow: 0;
+	padding: 3px;
+	display: flex;
+	margin: 0;
+	margin-left: 5px;
+}
+
+.status-group-right .status-text span:nth-of-type(2) {
+	text-align: center;
+}
+
 
 /* Responsive: Hide separator on smaller screens if groups wrap */
 @media (max-width: 992px) {
@@ -777,10 +856,10 @@ circle {
 }
 @media (max-width: 1700px) {
 	.status-group-left .status-text span:nth-of-type(2) {
-		max-width: 70px;
+		/* max-width: 70px; */
 		overflow: hidden;
 		text-overflow: ellipsis;
-		padding: 5px 5px !important;
+		/* padding: 5px 5px !important; */
 	}
 }
 @media (max-width: 1600px) {
@@ -788,17 +867,26 @@ circle {
 		max-width: unset;
 		/* overflow: hidden;
 		text-overflow: ellipsis; */
-		padding: 5px 10px !important;
-		margin-left: 5px;
+		/* padding: 5px 10px !important; */
+		/* margin-left: 5px; */
 	}
 	.status-group-left .status-text span:nth-of-type(1) {
-		display: none;
+		/* display: none; */
 	}
 	.status-group-right {
 		gap: 10px;
 	}
 		
 }
+@media (max-width: 1300px) {
+	.status-group-right .status-text span:nth-of-type(1) {
+		display: none;
+	}
+	.status-group-right .status-text span:nth-of-type(2) {
+		margin-left: 5px;
+	}
+}
+	
 
 @keyframes spin {
   to { transform: rotate(360deg); }

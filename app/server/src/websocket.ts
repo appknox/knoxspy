@@ -5,13 +5,14 @@ import { FridaManager } from "./fridamanager";
 import Channels from "./channels";
 import { Session } from "frida";
 import REPLManager from "./repl";
-import { DeviceDetails, SessionInfo, App, DashboardData, DeviceInfo, AppsDetails } from "./types";
+import { DeviceDetails, SessionInfo, App, DashboardData, DeviceInfo, AppsDetails, DashboardQueryParams } from "./types";
 
 /**
  * WebSocket message action types
  */
 enum WebSocketAction {
 	DASHBOARD_INIT = "dashboard.init",
+	DASHBOARD_UPDATE = "dashboard.update",
 
 	SESSION_CREATE = "session.create",
 	SESSION_DELETE = "session.delete",
@@ -36,6 +37,8 @@ enum WebSocketAction {
 	APP_SPAWN = "app.spawn",
 	APP_ATTACH = "app.attach",
 	APP_DISCONNECT = "app.disconnect",
+	
+	CONNECTION_CLEAR = "connection.clear",
 
 	LIBRARY_CHANGE = "library.change",
 	LIBRARY_LIST = "library.list",
@@ -65,6 +68,8 @@ enum WebSocketResponses {
 	RSP_LIBRARY_LIST = "library.list.ack",
 	RSP_LIBRARY_DELETE = "library.delete.ack",
 
+	RSP_CONNECTION_CLEAR = "connection.clear.ack",
+
 	RSP_GENERAL_ACK = "general.ack",
 }
 
@@ -78,7 +83,18 @@ interface WebSocketResponse {
 }
 
 // Global active session for all clients
-let activeSession: SessionInfo = { session: null, app: null, status: false, channel: null };
+let activeSession: SessionInfo = { session: null, app: null, status: false, channel: null};
+
+// Query params for dashboard every time an app is spawned or attached
+let dashboardQueryParams: DashboardQueryParams = {
+	sessionId: "",
+	device: "",
+	user: "-1",
+	app: "",
+	platform: "",
+	library: "",
+	action: "spawn"
+};
 
 
 // FridaManager singleton - for handling Frida operations
@@ -150,7 +166,7 @@ class WebSocketClient {
 	 * Clear the active session
 	 */
 	private clearActiveSession(): void {
-		activeSession = { session: null, app: null, status: false, channel: null };
+		activeSession = { session: null, app: null, status: false, channel: null};
 	}
 
 	/**
@@ -230,6 +246,9 @@ class WebSocketClient {
 			switch (data.action) {
 				case WebSocketAction.DASHBOARD_INIT:
 					await this.handleDashboardInit(data);
+					break;
+				case WebSocketAction.DASHBOARD_UPDATE:
+					await this.handleDashboardUpdate(data);
 					break;
 				case WebSocketAction.SESSION_CREATE:
 					if (!data.name) {
@@ -322,6 +341,9 @@ class WebSocketClient {
 				case WebSocketAction.REPEATER_TAB_UPDATE:
 					await this.handleRepeaterTabUpdate(data);
 					break;
+				case WebSocketAction.CONNECTION_CLEAR:
+					await this.handleConnectionClear(data);
+					break;
 				default:
 					this.sendJsonError(["Unknown action: " + data.action]);
 			}
@@ -336,6 +358,10 @@ class WebSocketClient {
 				}`
 			);
 		}
+	}
+
+	private async handleConnectionClear(data: any): Promise<void> {
+		
 	}
 
 	private async handleLibraryChange(data: any): Promise<void> {
@@ -503,6 +529,10 @@ class WebSocketClient {
 			action: WebSocketResponses.RSP_DASHBOARD_INIT,
 			data: dashboardData,
 		});
+	}
+
+	private async handleDashboardUpdate(data: any): Promise<void> {
+		activeSession.dashboard_data["selection"] = data.selection || {};
 	}
 
 	private async handleSessionCreate(data: any): Promise<void> {
@@ -729,7 +759,7 @@ class WebSocketClient {
 		console.log(`Session event: connected=${session.status}, session=`, session);
 		if(session.status === true && session.session) {
 			console.log("Session connected");
-			activeSession = { session: session.session, app: session.app, status: true, channel: session.channel};
+			activeSession = { session: session.session, app: session.app, status: true, channel: session.channel };
 			await fridaManager.saveActiveSession(session.session);
 		} else {
 			console.log("Session disconnected");
@@ -805,6 +835,22 @@ export default class WebSocketManager {
 
 	public getActiveSession(): SessionInfo | null {
 		return activeSession;
+	}
+
+	public setSelection(data: any): void {
+		if (activeSession) {
+			dashboardQueryParams.action = data.action || "spawn";
+			dashboardQueryParams.sessionId = data.sessionId || "";
+			dashboardQueryParams.device = data.device || "";
+			dashboardQueryParams.user = data.user || "-1";
+			dashboardQueryParams.app = data.app || "";
+			dashboardQueryParams.platform = data.platform || "";
+			dashboardQueryParams.library = data.library || "";
+			console.log("WebSocketManager(setSelection): Updated dashboard query params:", dashboardQueryParams);
+		}
+	}
+	public getSelection(): DashboardQueryParams {
+		return dashboardQueryParams;
 	}
 
 	/**

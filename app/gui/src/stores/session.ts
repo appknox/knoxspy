@@ -28,6 +28,7 @@ export const useAppStore = defineStore('current_session', {
             sessionStatus: false,
             appStatus: false,
             appConnectingStatus: false,
+            appConnectionTime: 0,
             sidebarStatus: false,
         } as DashboardStatus,
         connectedApp: {
@@ -54,15 +55,43 @@ export const useAppStore = defineStore('current_session', {
         },
         setSelectionKey(key: keyof DashboardSelectedData, value: any) {
             this.selection[key] = value;
+            // console.log(`Session(setSelectionKey): Updated selection key ${key} with value`, value);
         },
         setStatus(data: DashboardStatus) {
             this.status = data;
         },
-        setStatusKey(key: keyof DashboardStatus, value: any) {
+        setStatusKey<K extends keyof DashboardStatus>(key: K, value: DashboardStatus[K]) {
             this.status[key] = value;
         },
         setConnectedApp(data: ConnectedApp) {
             this.connectedApp = data;
+        },
+        async syncBackSelection(callback?: () => void) {
+            console.log("Session(updateSelectionFromServer): Updating selection from server");
+            await fetch("http://localhost:8000/api/sync/selection", {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            }).then((response) => response.json()).then((data) => {
+                console.log("Session(syncBackSelection): Data synced from server", data);
+                if(data.status) {
+                    this.setSelectionKey("sessionId", data.selection.sessionId || "");
+                    const t_query_params = {
+                        app: data.selection.app,
+                        device: data.selection.device,
+                        platform: data.selection.platform,
+                        user: data.selection.user,
+                        library: data.selection.library || "",
+                        action: data.selection.action,
+                    }
+                    this.updateSelectionFromServer(t_query_params);
+
+                    if(callback) {
+                        callback();
+                    }
+                }
+            });
         },
         async syncConnectedApp() {
             await fetch("http://localhost:8000/api/connected", {
@@ -75,6 +104,46 @@ export const useAppStore = defineStore('current_session', {
             });
             return this.connectedApp;
         },
+        async syncSelection() {
+            let t_selection_minimal = {
+                app: "",
+                device: "",
+                platform: "",
+                user: "-1",
+                library: "",
+                action: "spawn",
+                sessionId: ""
+            };
+            if(this.getSelection.app.id) {
+                t_selection_minimal["app"] = this.getSelection.app.id;
+            }
+            if(this.getSelection.device.id) {
+                t_selection_minimal["device"] = this.getSelection.device.id;
+            }
+            if(this.getSelection.platform) {
+                t_selection_minimal["platform"] = this.getSelection.platform;
+            }
+            if(this.getSelection.user.id) {
+                t_selection_minimal["user"] = this.getSelection.user.id;
+            }
+            if(this.getSelection.library.file) {
+                t_selection_minimal["library"] = this.getSelection.library.file;
+            }
+            if(this.getSelection.action) {
+                t_selection_minimal["action"] = this.getSelection.action;
+            }
+            if(this.getSelection.sessionId) {
+                t_selection_minimal["sessionId"] = this.getSelection.sessionId;
+            }
+            console.log("Session(syncSelection): Syncing selection to server", t_selection_minimal);
+            await fetch("http://localhost:8000/api/sync/selection", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(t_selection_minimal),
+            });
+        },
 
 
         // General Actions
@@ -85,16 +154,32 @@ export const useAppStore = defineStore('current_session', {
             }
             return false;
         },
-        updateSelectionUsingQueryParams(queryParams: any) {
-            // console.log("Session(updateSelectionUsingQueryParams): Updating selection using query params", queryParams);
+        checkRequiredSelection() {
+            console.log("Session(checkRequiredSelection): Checking required selection");
+            if(this.getSelection.app.id && this.getSelection.device.id && this.getSelection.platform && (this.getSelection.platform.toLowerCase() === "android" && this.getSelection.user.id || true)) {
+                return true;
+            }
+            return false;
+        },
+        updateSelectionFromServer(queryParams: any) {
+            console.log("Session(updateSelectionFromServer): Updating selection from server");
             const t_app = queryParams.app;
             const t_device = queryParams.device;
             const t_action = queryParams.action;
             const t_platform = queryParams.platform;
             const t_user = queryParams.user;
             const t_library = queryParams.library || "";
-            // console.log("Session(updateSelectionUsingQueryParams): Updating selection using query params", t_app, t_device, t_action, t_platform, t_user, t_library);
+            console.log("Session(updateSelectionUsingQueryParams): Data ", this.getData);
+            
             const t_device_obj = this.getData.devices.filter((device: any) => device.id === t_device)[0];
+            if(!t_device_obj) {
+                console.log("Session(updateSelectionUsingQueryParams): Device not found in data", t_device);
+                return false;
+            } else {
+                this.setDefaultDevice();
+            }
+            console.log("Session(updateSelectionUsingQueryParams): Device object", t_device_obj);
+            
             this.setSelectionKey("device", t_device_obj);
             this.setSelectionKey("platform", t_platform);
             this.setSelectionKey("action", t_action);
@@ -127,11 +212,116 @@ export const useAppStore = defineStore('current_session', {
                 const t_library_obj = this.getData.libraries.filter((library: any) => library.file === t_library)[0];
                 this.setSelectionKey("library", t_library_obj);
             }
+            return true;
+        },
+        updateSelectionUsingQueryParams(queryParams: any) {
+            // console.log("Session(updateSelectionUsingQueryParams): Updating selection using query params", queryParams);
+            if (!this.getSelection.device) {
+                console.log("Session(updateSelectionUsingQueryParams): No device selected, cannot update selection using query params");
+                return false;
+            }
+            const t_app = queryParams.app;
+            const t_device = queryParams.device;
+            const t_action = queryParams.action;
+            const t_platform = queryParams.platform;
+            const t_user = queryParams.user;
+            const t_library = queryParams.library || "";
+            console.log("Session(updateSelectionUsingQueryParams): Data ", this.getData);
+            
+            // console.log("Session(updateSelectionUsingQueryParams): Updating selection using query params", t_app, t_device, t_action, t_platform, t_user, t_library);
+            const t_device_obj = this.getData.devices.filter((device: any) => device.id === t_device)[0];
+            if(!t_device_obj) {
+                console.log("Session(updateSelectionUsingQueryParams): Device not found in data", t_device);
+                return false;
+            } else {
+                this.setDefaultDevice();
+            }
+            console.log("Session(updateSelectionUsingQueryParams): Device object", t_device_obj);
+            
+            this.setSelectionKey("device", t_device_obj);
+            this.setSelectionKey("platform", t_platform);
+            this.setSelectionKey("action", t_action);
+            let t_user_obj = {};
+            let t_apps_obj = [];
+            let t_app_obj = {};
+            let t_users_obj = [];
+            if(t_platform.toLowerCase() === "android") {
+                t_user_obj = t_device_obj.users.filter((user: any) => user.id === t_user)[0];
+                t_apps_obj = t_device_obj.users.filter((user: any) => user.id === t_user)[0].apps;
+                t_app_obj = t_apps_obj.filter((app: any) => app.id === t_app)[0];
+                t_users_obj = t_device_obj.users;
+                this.setSelectionKey("user", t_user_obj);
+                this.setSelectionKey("apps", t_apps_obj);
+                this.setSelectionKey("app", t_app_obj);
+                this.setDataKey("users", t_users_obj);
+                // console.log("Session(updateSelectionUsingQueryParams): Updating user using query params", t_user_obj);
+            } else {
+                t_apps_obj = t_device_obj.users[0];
+                t_app_obj = t_apps_obj.filter((app: any) => app.id === t_app)[0];
+                // console.log("Session(updateSelectionUsingQueryParams): Updating user using query params", t_apps_obj);
+                this.setSelectionKey("user", t_user_obj);
+                this.setSelectionKey("apps", t_apps_obj);
+                this.setSelectionKey("app", t_app_obj);
+                this.setDataKey("users", []);   
+            }
+
+            if(t_library) {
+                // console.log("Session(updateSelectionUsingQueryParams): Updating library using query params", t_library);
+                const t_library_obj = this.getData.libraries.filter((library: any) => library.file === t_library)[0];
+                this.setSelectionKey("library", t_library_obj);
+            }
+            return true;
         },
         resetSelectedApp() {
             this.setSelectionKey("sessionId", "");
             this.setStatusKey("appStatus", false);
             this.syncConnectedApp();
+        },
+        setDefaultDevice() {
+            console.log("Session(setDefaultDevice): Setting default device");
+            
+            if (this.getData.devices.length === 0) {
+                console.log("Session(setDefaultDevice): No devices found, cannot set default device");
+                return;
+            }
+            const t_device = this.getData.devices[0];
+            this.setSelectionKey("device", t_device);
+            this.setSelectionKey("platform", t_device.platform);
+            let t_apps = [];
+            if(t_device.platform.toLowerCase() === "android") {
+                t_apps = t_device.users.filter((user: any) => user.id == "0")[0].apps;
+                this.setDataKey("users", t_device.users);
+                this.setSelectionKey("user", t_device.users.filter((user: any) => user.id == "0")[0]);
+            } else {
+                t_apps = t_device.users[0];
+                this.setDataKey("users", []);
+                this.setSelectionKey("user", {});
+            }
+            this.setSelectionKey("apps", t_apps);
+        },
+        setSelectedAppFromConnectedApp() {
+            console.log("Session(setSelectedAppFromConnectedApp): Setting selected app from connected app");
+            this.setSelectionKey("app", this.getConnectedApp.app);
+        },
+
+        // Timer actions
+        startAppConnectionTimer() {
+            console.log("Session(startAppConnectionTimer): Starting app connection timer");
+            this.setStatusKey("appConnectionTime", 0);
+            const interval = setInterval(() => {
+                if (this.getStatus.appConnectionTime) {
+                    this.setStatusKey("appConnectionTime", this.getStatus.appConnectionTime + 1);
+                } else {
+                    clearInterval(interval);
+                }
+            }
+            , 1000);
+            return interval;
+        },
+        stopAppConnectionTimer(interval: any) {
+            console.log("Session(stopAppConnectionTimer): Stopping app connection timer");
+            clearInterval(interval);
+            this.setStatusKey("appConnectionTime", 0);
         }
     }
 });

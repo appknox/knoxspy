@@ -7,7 +7,13 @@ import AppManager from './views/AppManager.vue'
 import AppSelector from './views/AppSelector.vue'
 
 const routes = [
-  { path: '/', component: Sessions, name: 'Sessions'},
+  { path: '/', beforeEnter: (to, from, next) => {
+    if (Object.keys(from.query).length && Object.keys(to.query).length === 0) {
+      next({ path: to.path, query: from.query });
+    } else {
+      next();
+    }
+  }, component: Sessions, name: 'Sessions'},
   { path: '/traffic', beforeEnter: (to, from, next) => {
     if (Object.keys(from.query).length && Object.keys(to.query).length === 0) {
       next({ path: to.path, query: from.query });

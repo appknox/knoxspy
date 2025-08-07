@@ -87,6 +87,31 @@ router.get("/connected", async (req: Request, res: Response) => {
 	return res.status(200).json(activeSession);
 });
 
+router.post("/sync/selection", async (req: Request, res: Response) => {
+	const selectionData = req.body;
+	if (!selectionData) {
+		return res.status(400).json({ status: false, message: "No selection data provided" });
+	}
+	wsManager.setSelection(selectionData);
+	
+	return res.status(200).json({
+		status: true,
+		message: "Selection data synced successfully"
+	});
+});
+
+router.get("/sync/selection", async (req: Request, res: Response) => {
+	const activeSession = wsManager.getSelection();
+	if (!activeSession) {
+		return res.status(404).json({ status: false, message: "No active session or selection data found" });
+	}
+	return res.status(200).json({
+		status: true,
+		selection: activeSession || {},
+		message: "Selection data retrieved successfully"
+	});
+});
+
 router.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
 	if (!req.file) {
 		return res.status(400).json({ status: false, message: "No file uploaded" });

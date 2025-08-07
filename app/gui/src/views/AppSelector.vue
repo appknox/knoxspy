@@ -3,15 +3,10 @@
         <div id="app-wrapper">
             <div style="display: none;">
                 <p>App Connection Status: {{  cs.getStatus.appConnectingStatus }}</p>
+                <p>App Connection Time: {{ cs.getStatus.appConnectionTime }}</p>
                 <p>App Status: {{ (cs.getStatus.appStatus ? cs.getStatus.appStatus : false ) }}</p>
-                <p>Selected App: {{ cs.getSelection.app }}</p>
-                <p>First check: {{ cs.getSelection.app ||  (cs.getStatus.appStatus ? cs.getStatus.appStatus : false ) }}</p>
-                <!-- 
-                First check:
-                - If app is not being connected to (cs.getStatus.appConnectingStatus is false)
-                    - If app data is present on dashboard (cs.getSelection.app exists) (show spawn/attach buttons)
-                    - If app is connected (cs.getStatus.appStatus is true) (show traffic/disconnect buttons)
-                -->
+                <p style="display: none;">Selected App: {{ cs.getSelection.app }}</p>
+                <p style="display: none;">First check: {{ cs.getSelection.app ||  (cs.getStatus.appStatus ? cs.getStatus.appStatus : false ) }}</p>
             </div>
             <Card style="width: 25rem; overflow: hidden">
                 <template #content v-if="!cs.getStatus.appConnectingStatus && (cs.getSelection.app || (cs.getStatus.appStatus ? cs.getStatus.appStatus : false ))">
@@ -80,9 +75,35 @@ export default defineComponent({
     },
     async mounted() {
         const t_requiredQueryParams = this.cs.checkRequiredQueryParams(this.$route.query);
+        console.log("AppSelector(mounted): Query Params:", this.$route.query);
+        
         console.log("AppSelector(mounted): Required query params:", t_requiredQueryParams);
         if(!t_requiredQueryParams) {
-            this.$router.push("/apps");
+            console.log("AppSelector(mounted): No required query params found, checking existing selection");
+            console.log("AppSelector(mounted): Existing selection:", this.cs.getSelection);
+            // let t_selection_valid = this.cs.checkRequiredSelection();
+            // if(!t_selection_valid) {
+            //     await this.cs.syncBackSelection();
+            //     t_selection_valid = this.cs.checkRequiredSelection();
+            // }
+            // if(t_selection_valid) {
+            //     console.log("AppSelector(mounted): Existing selection is valid, updating query params");
+            //     this.$router.replace({
+            //         path: "/app",
+            //         query: {
+            //             ...this.$route.query,
+            //             device: this.cs.getSelection.device.id,
+            //             platform: this.cs.getSelection.platform,
+            //             app: this.cs.getSelection.app.id,
+            //             user: this.cs.getSelection.user.id || -1,
+            //             library: this.cs.getSelection.library ? this.cs.getSelection.library.file : null,
+            //             action: this.cs.getSelection.action || "spawn"
+            //         }
+            //     });
+            // } else {
+            //     console.log("AppSelector(mounted): Existing selection is not valid, going to /apps");
+            //     // this.$router.push("/apps");
+            // }
         }
         if(this.ws.isConnected && this.cs.getStatus.dashboardStatus) {
             console.log("AppSelector(mounted): Page switch");
@@ -153,8 +174,10 @@ export default defineComponent({
         startApp(action: string | null = null) {
             console.log("AppSelector(startApp): Starting app ", action, this.cs.getSelection.action);
             this.cs.setStatusKey("appConnectingStatus", true);
+            this.cs.startAppConnectionTimer();
             const t_session_id = crypto.randomUUID();
             this.cs.setSelectionKey("sessionId", t_session_id);
+            this.cs.syncSelection();
             this.ws.send(JSON.stringify({
                 "action": "app." + (action || this.cs.getSelection.action),
                 "deviceId": this.cs.getSelection.device.id,
