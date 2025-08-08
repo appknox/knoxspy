@@ -7,9 +7,9 @@
                 <div class="section-header">
                     <div class="section-header-device">
                         <h4>Apps For</h4>
-                        <Dropdown v-model="cs.getSelection.device" :options="cs.getData.devices" optionLabel="name" @change="switchDevice" class="w-full md:w-14rem" :placeholder="cs.getSelection.device?.value || 'Select a Device'">
+                        <Dropdown v-model="cs.getSelection.device" :options="cs.getData.devices" optionLabel="name" @change="switchDevice" class="w-full md:w-14rem" :placeholder="cs.getSelection.device.id ? cs.getSelection.device.id : 'Select a Device'">
                             <template #value="slotProps">
-                                <div v-if="slotProps.value" class="flex align-items-center">
+                                <div v-if="slotProps.value.id" class="flex align-items-center">
                                     <div v-if="slotProps.value.platform === 'iOS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.value.name }}</div>
                                     <div v-if="slotProps.value.platform === 'iPhone OS'"><i style="margin-right: 5px;" class="pi pi-apple"></i>{{ slotProps.value.name }}</div>
                                     <div v-if="slotProps.value.platform === 'Android'"><i style="margin-right: 5px;" class="pi pi-android"></i>{{ slotProps.value.name }}</div>
@@ -44,7 +44,7 @@
                         </div>
                     </div>
                 </div>
-                <div v-if="cs.getSelection.device == null" style="display: flex; width: 100%; height: calc(100vh - 65px); justify-content: center; align-items: center; flex-direction: column;">
+                <div v-if="!cs.getSelection.device || !cs.getSelection.device.id" style="display: flex; width: 100%; height: calc(100vh - 65px); justify-content: center; align-items: center; flex-direction: column;">
                     <i style="font-size: 40px; color: var(--surface-500);" class="pi pi-info-circle"></i>
                     <p style="font: 25px 'Fira Code'; color: var(--surface-500)">No Device Selected!</p>
                 </div>
@@ -465,6 +465,7 @@ export default defineComponent({
     align-content: center;
     border-radius: 10px;
     transition: all linear .4s;
+    overflow-wrap: break-word;
 }
 .section-apps .app-list li:hover {
     box-shadow: 0px 0px 15px -5px #0005;

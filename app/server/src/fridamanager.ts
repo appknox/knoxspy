@@ -252,6 +252,39 @@ export class FridaManager {
 	}
 
 	/**
+	 * Find process PIDs by user ID
+	 * @param deviceId The device ID
+	 * @param appName The application name to filter by
+	 * @param targetUid The user ID to filter by
+	 * @returns List of process PIDs
+	 */
+	async findProcessPidsByUid(deviceId: string, appName: string, targetUid: number): Promise<string[]> {
+		const device = client.getDevice(deviceId);
+
+		// Filter ps output for processes whose USER column starts with u{targetUid}_
+		const shellCmd = `ps -A | grep ${appName} | grep -E "^u${targetUid}_"`;
+
+		return device.shell(shellCmd)
+			.then(Adb.util.readAll)
+			.then((output: string) => {
+				const lines = output.toString().trim().split("\n").filter(Boolean);
+
+				if (lines.length === 0) {
+					return [];
+				}
+
+				// Extract PID from column 2 (index 1) of each line
+				const pids = lines.map(line => {
+					const parts = line.trim().split(/\s+/);
+					return { pid: parts[1] }; // PID column
+				});
+
+				return pids;
+			});
+	}
+
+
+	/**
 	 * Find applications on a device
 	 * @param deviceId The device ID
 	 * @returns Tuple of [apps, error]
@@ -347,15 +380,15 @@ export class FridaManager {
 	 * @param processID The process ID
 	 * @returns Frida session
 	 */
-	async attachToApp(deviceId: string, processID: number): Promise<frida.Session> {
+	async attachToApp(deviceId: string, processID: string): Promise<frida.Session> {
 		try {
-			const device = await this.getDeviceById(deviceId);
+			const device = await frida.getDevice(deviceId);
 
 			if (!device) {
 				throw new Error(`Device with ID ${deviceId} not found`);
 			}
 
-			const session = await device.attach(processID);
+			const session = await device.attach(parseInt(processID));
 
 			// Store session for later cleanup
 			// const sessionKey = `${deviceId}-pid-${processID}`;

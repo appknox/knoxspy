@@ -449,7 +449,17 @@ class WebSocketClient {
 	}
 
 	private async handleAppAttach(data: any): Promise<void> {
-		const t_process = await fridaManager.findProcesses(data.deviceId, data.appName);
+		const platform = data.platform;
+		const user = data.user;
+		const appName = data.appName;
+		const deviceId = data.deviceId;
+		let t_process = [];
+
+		if(platform.toLowerCase() === "android") {
+			t_process = await fridaManager.findProcessPidsByUid(deviceId, appName, parseInt(user));
+		} else {
+			t_process = await fridaManager.findProcesses(deviceId, appName);
+		}
 		if(!t_process.length) {
 			this.sendError("Process not found");
 			return;
@@ -697,6 +707,8 @@ class WebSocketClient {
 	private async handleRepeaterReplay(data: any): Promise<void> {
 		const replayPayload = data.replay;
 		const platform = data.platform;
+		const user = data.user;
+		// const deviceId = data.deviceId;
 
 		// Select the appropriate script based on platform
 		const library =
@@ -709,23 +721,27 @@ class WebSocketClient {
 			const deviceId = activeSession!.app!.deviceId;
 			const appName = activeSession!.app!.name;
 			console.log("Searching for process", deviceId, appName);
-			const processes = await fridaManager.findProcesses(
-				deviceId,
-				appName
-			);
-			console.log("Found process", processes);
+			let processes = [];
+			
+			if(platform.toLowerCase() === "android") {
+				processes = await fridaManager.findProcessPidsByUid(deviceId, appName, parseInt(user));
+				console.log("Found PIDs", processes);
+			} else {
+				processes = await fridaManager.findProcesses(
+					deviceId,
+					appName
+				);
+				console.log("Found process", processes);
+			}
 
-			if (!processes.length) {
+			if(!processes.length) {
 				return this.sendError("App not running");
 			}
 
 			const processId = processes[0].pid;
 
 			// Attach to the app
-			const session = await fridaManager.attachToApp(
-				deviceId,
-				processId
-			);
+			const session = await fridaManager.attachToApp(deviceId, processId);
 
 			activeSession.session = session;
 

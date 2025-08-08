@@ -553,7 +553,7 @@ export default defineComponent({
                 t_replayPayload['response_headers'] = ""
                 t_replayPayload['session_id'] = tmpRepeaterData.session_id
                 console.log("Replay payload", t_replayPayload);
-                this.ws.send(JSON.stringify({'action': 'repeater.replay', 'replay': t_replayPayload, 'platform': this.cs.getSelection.platform}))
+                this.ws.send(JSON.stringify({'action': 'repeater.replay', 'replay': t_replayPayload, 'platform': this.cs.getSelection.platform, 'user': this.cs.getSelection.user.id, 'deviceId': this.cs.getSelection.device.id}))
             }
         },
         changeRepeater(event: any) {
