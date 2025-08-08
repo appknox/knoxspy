@@ -196,9 +196,8 @@ npm run test
 ## 📚 **Documentation**
 
 ### 📖 **Additional Resources**
-- **Whitepaper**: "Demystifying Network Libraries for Mobile Security"
-- **Blog Posts**: Detailed analysis and case studies
-- **Video Tutorials**: Step-by-step usage guides
+- **Whitepaper**: [Demystifying Network Libraries for Mobile Security](https://www.appknox.com/resources/ebooks/demystifying-network-libraries#main-content)
+
 
 ### 🔗 **References**
 - [Frida Documentation](https://frida.re/docs/)
