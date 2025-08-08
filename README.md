@@ -196,7 +196,7 @@ npm run test
 ## 📚 **Documentation**
 
 ### 📖 **Additional Resources**
-- **Whitepaper**: [Demystifying Network Libraries for Mobile Security](https://www.appknox.com/resources/ebooks/demystifying-network-libraries#main-content)
+- **Whitepaper**: [Demystifying Network Libraries for Mobile Security](https://www.appknox.com/resources/ebooks/demystifying-network-libraries)
 
 
 ### 🔗 **References**
