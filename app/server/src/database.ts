@@ -1,6 +1,7 @@
 import { Database as SQLiteDatabase } from "sqlite3";
 import path from "path";
-import { existsSync, mkdirSync } from "fs";
+import {load} from 'js-yaml';
+import { existsSync, mkdirSync, readFileSync } from "fs";
 
 /**
  * Database response type for standardized responses
@@ -92,6 +93,86 @@ export default class DBManager {
   }
 
   /**
+   * Load library data from YAML configuration file
+   */
+  private async loadLibrariesFromConfig(): Promise<void> {
+    try {
+      const configPath = path.join(__dirname, "../library.yaml");
+
+      if (!existsSync(configPath)) {
+        throw new Error(`library.yaml not found at: ${configPath}`);
+      }
+
+      const fileContents = readFileSync(configPath, "utf8");
+      const config = load(fileContents) as any;
+
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        throw new Error('Invalid library.yaml: Must be a YAML object');
+      }
+
+      const rootKeys = Object.keys(config);
+      if (rootKeys.length !== 1 || rootKeys[0] !== 'library') {
+        throw new Error(`Invalid library.yaml: Root key must be 'library', found: [${rootKeys.join(', ')}]`);
+      }
+
+      if (!Array.isArray(config.library)) {
+        throw new Error('Invalid library.yaml: "library" must be an array');
+      }
+
+      const requiredFields = ['name', 'file', 'platform'];
+      const validLibraries: LibraryData[] = [];
+
+      for (let i = 0; i < config.library.length; i++) {
+        const entry = config.library[i];
+
+        // Check required fields
+        const missingFields = requiredFields.filter(field => !entry[field]);
+        if (missingFields.length > 0) {
+          throw new Error(`library[${i}]: Missing required fields: [${missingFields.join(', ')}]`);
+        }
+
+        const { name, file, platform } = entry;
+
+        if (typeof name !== 'string' || typeof file !== 'string' || typeof platform !== 'string') {
+          throw new Error(`library[${i}]: All fields must be strings`);
+        }
+
+        if (!name.trim() || !file.trim() || !platform.trim()) {
+          throw new Error(`library[${i}]: Fields cannot be empty`);
+        }
+
+        // Security: Prevent path traversal
+        if (file.includes('..') || file.includes('/') || file.includes('\\')) {
+          throw new Error(`library[${i}]: Invalid file path: ${file}`);
+        }
+
+        if (!['android', 'ios'].includes(platform.toLowerCase())) {
+          throw new Error(`library[${i}]: platform must be 'Android' or 'iOS', found: ${platform}`);
+        }
+
+        const normalizedPlatform = platform.toLowerCase() === 'ios' ? 'iOS' : 'Android';
+
+        validLibraries.push({
+          name: name.trim(),
+          file: file.trim(),
+          platform: normalizedPlatform
+        });
+      }
+
+      await this.execute('DELETE FROM library');
+      
+      for (const library of validLibraries) {
+        await this.createNewLibrary(library);
+      }
+
+      console.log(`Loaded ${validLibraries.length} libraries from library.yaml`);
+
+    } catch (error) {
+      console.error('Failed to load libraries:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
    * Initialize database tables
    */
   private initializeDatabase(): void {
@@ -152,6 +233,9 @@ export default class DBManager {
     });
 
     this.initialized = true;
+    
+    // Load libraries from YAML configuration
+    this.loadLibrariesFromConfig();
   }
 
   /**
