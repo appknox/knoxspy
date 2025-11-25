@@ -97,26 +97,26 @@ export default class DBManager {
    */
   private async loadLibrariesFromConfig(): Promise<void> {
     try {
-      const configPath = path.join(__dirname, "../library.yaml");
+      const configPath = path.join(__dirname, "../config.yaml");
 
       if (!existsSync(configPath)) {
-        throw new Error(`library.yaml not found at: ${configPath}`);
+        throw new Error(`config.yaml not found at: ${configPath}`);
       }
 
       const fileContents = readFileSync(configPath, "utf8");
       const config = load(fileContents) as any;
 
       if (!config || typeof config !== 'object' || Array.isArray(config)) {
-        throw new Error('Invalid library.yaml: Must be a YAML object');
+        throw new Error('Invalid config.yaml: Must be a YAML object');
       }
 
       const rootKeys = Object.keys(config);
       if (rootKeys.length !== 1 || rootKeys[0] !== 'library') {
-        throw new Error(`Invalid library.yaml: Root key must be 'library', found: [${rootKeys.join(', ')}]`);
+        throw new Error(`Invalid config.yaml: Root key must be 'library', found: [${rootKeys.join(', ')}]`);
       }
 
       if (!Array.isArray(config.library)) {
-        throw new Error('Invalid library.yaml: "library" must be an array');
+        throw new Error('Invalid config.yaml: "library" must be an array');
       }
 
       const requiredFields = ['name', 'file', 'platform'];
@@ -158,14 +158,13 @@ export default class DBManager {
           platform: normalizedPlatform
         });
       }
-
-      await this.execute('DELETE FROM library');
       
+      // Insert libraries (table should already be empty when this is called)
       for (const library of validLibraries) {
         await this.createNewLibrary(library);
       }
 
-      console.log(`Loaded ${validLibraries.length} libraries from library.yaml`);
+      console.log(`Loaded ${validLibraries.length} libraries from config.yaml`);
 
     } catch (error) {
       console.error('Failed to load libraries:', error instanceof Error ? error.message : String(error));
@@ -175,7 +174,7 @@ export default class DBManager {
   /**
    * Initialize database tables
    */
-  private initializeDatabase(): void {
+  private async initializeDatabase(): Promise<void> {
     const tables = [
       `CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,18 +223,101 @@ export default class DBManager {
       )`,
     ];
 
-    tables.forEach((sql) => {
-      this.db.run(sql, (err) => {
-        if (err) {
-          console.error("Error creating table:", err.message);
-        }
-      });
-    });
+    // Wait for all tables to be created before continuing
+    for (const sql of tables) {
+      await this.execute(sql);
+    }
 
     this.initialized = true;
     
-    // Load libraries from YAML configuration
-    this.loadLibrariesFromConfig();
+    // Load libraries from YAML only if library table is empty
+    await this.checkAndLoadLibraries();
+  }
+
+  /**
+   * Check library table and sync with YAML config
+   * - If table is empty: Load all from YAML
+   * - If table has data: Add only NEW libraries from YAML (merge)
+   */
+  private async checkAndLoadLibraries(): Promise<void> {
+    try {
+      const existingLibraries = await this.getLibraries();
+      
+      if (existingLibraries.length === 0) {
+        console.log('Library table is empty, loading from config.yaml...');
+        await this.loadLibrariesFromConfig();
+      } else {
+        console.log(`Found ${existingLibraries.length} existing libraries in database`);
+        await this.syncLibrariesFromYAML(existingLibraries);
+      }
+    } catch (error) {
+      console.error('Error checking libraries:', error);
+    }
+  }
+
+  /**
+   * Sync libraries from YAML - add only new ones that don't exist in DB
+   */
+  private async syncLibrariesFromYAML(existingLibraries: LibraryData[]): Promise<void> {
+    try {
+      const configPath = path.join(__dirname, "../config.yaml");
+
+      if (!existsSync(configPath)) {
+        console.log('No config.yaml found, skipping sync');
+        return;
+      }
+
+      const fileContents = readFileSync(configPath, "utf8");
+      const config = load(fileContents) as any;
+
+      // Basic validation
+      if (!config?.library || !Array.isArray(config.library)) {
+        console.log('Invalid config.yaml format, skipping sync');
+        return;
+      }
+
+      const existingNames = new Set(
+        existingLibraries.map(lib => lib.name.toLowerCase())
+      );
+      const existingFiles = new Set(
+        existingLibraries.map(lib => lib.file.toLowerCase())
+      );
+
+      const newLibraries: LibraryData[] = [];
+
+      // Check each YAML entry
+      for (const entry of config.library) {
+        if (!entry.name || !entry.file || !entry.platform) {
+          continue;
+        }
+
+        const nameLower = entry.name.trim().toLowerCase();
+        const fileLower = entry.file.trim().toLowerCase();
+
+        // Only add if not already in database
+        if (!existingNames.has(nameLower) && !existingFiles.has(fileLower)) {
+          const normalizedPlatform = entry.platform.toLowerCase() === 'ios' ? 'iOS' : 'Android';
+          
+          newLibraries.push({
+            name: entry.name.trim(),
+            file: entry.file.trim(),
+            platform: normalizedPlatform
+          });
+        }
+      }
+
+      if (newLibraries.length > 0) {
+        for (const library of newLibraries) {
+          await this.createNewLibrary(library);
+        }
+        console.log(`Added ${newLibraries.length} new libraries from config.yaml`);
+      } else {
+        console.log('No new libraries to add from config.yaml');
+      }
+
+    } catch (error) {
+      console.error('Error syncing libraries from YAML:', error instanceof Error ? error.message : String(error));
+    }
   }
 
   /**
