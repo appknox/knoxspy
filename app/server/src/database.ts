@@ -1,6 +1,7 @@
 import { Database as SQLiteDatabase } from "sqlite3";
 import path from "path";
-import { existsSync, mkdirSync } from "fs";
+import {load} from 'js-yaml';
+import { existsSync, mkdirSync, readFileSync } from "fs";
 
 /**
  * Database response type for standardized responses
@@ -92,9 +93,88 @@ export default class DBManager {
   }
 
   /**
+   * Load library data from YAML configuration file
+   */
+  private async loadLibrariesFromConfig(): Promise<void> {
+    try {
+      const configPath = path.join(__dirname, "../config.yaml");
+
+      if (!existsSync(configPath)) {
+        throw new Error(`config.yaml not found at: ${configPath}`);
+      }
+
+      const fileContents = readFileSync(configPath, "utf8");
+      const config = load(fileContents) as any;
+
+      if (!config || typeof config !== 'object' || Array.isArray(config)) {
+        throw new Error('Invalid config.yaml: Must be a YAML object');
+      }
+
+      const rootKeys = Object.keys(config);
+      if (rootKeys.length !== 1 || rootKeys[0] !== 'library') {
+        throw new Error(`Invalid config.yaml: Root key must be 'library', found: [${rootKeys.join(', ')}]`);
+      }
+
+      if (!Array.isArray(config.library)) {
+        throw new Error('Invalid config.yaml: "library" must be an array');
+      }
+
+      const requiredFields = ['name', 'file', 'platform'];
+      const validLibraries: LibraryData[] = [];
+
+      for (let i = 0; i < config.library.length; i++) {
+        const entry = config.library[i];
+
+        // Check required fields
+        const missingFields = requiredFields.filter(field => !entry[field]);
+        if (missingFields.length > 0) {
+          throw new Error(`library[${i}]: Missing required fields: [${missingFields.join(', ')}]`);
+        }
+
+        const { name, file, platform } = entry;
+
+        if (typeof name !== 'string' || typeof file !== 'string' || typeof platform !== 'string') {
+          throw new Error(`library[${i}]: All fields must be strings`);
+        }
+
+        if (!name.trim() || !file.trim() || !platform.trim()) {
+          throw new Error(`library[${i}]: Fields cannot be empty`);
+        }
+
+        // Security: Prevent path traversal
+        if (file.includes('..') || file.includes('/') || file.includes('\\')) {
+          throw new Error(`library[${i}]: Invalid file path: ${file}`);
+        }
+
+        if (!['android', 'ios'].includes(platform.toLowerCase())) {
+          throw new Error(`library[${i}]: platform must be 'Android' or 'iOS', found: ${platform}`);
+        }
+
+        const normalizedPlatform = platform.toLowerCase() === 'ios' ? 'iOS' : 'Android';
+
+        validLibraries.push({
+          name: name.trim(),
+          file: file.trim(),
+          platform: normalizedPlatform
+        });
+      }
+      
+      // Insert libraries (table should already be empty when this is called)
+      for (const library of validLibraries) {
+        await this.createNewLibrary(library);
+      }
+
+      console.log(`Loaded ${validLibraries.length} libraries from config.yaml`);
+
+    } catch (error) {
+      console.error('Failed to load libraries:', error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  /**
    * Initialize database tables
    */
-  private initializeDatabase(): void {
+  private async initializeDatabase(): Promise<void> {
     const tables = [
       `CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,15 +223,101 @@ export default class DBManager {
       )`,
     ];
 
-    tables.forEach((sql) => {
-      this.db.run(sql, (err) => {
-        if (err) {
-          console.error("Error creating table:", err.message);
-        }
-      });
-    });
+    // Wait for all tables to be created before continuing
+    for (const sql of tables) {
+      await this.execute(sql);
+    }
 
     this.initialized = true;
+    
+    // Load libraries from YAML only if library table is empty
+    await this.checkAndLoadLibraries();
+  }
+
+  /**
+   * Check library table and sync with YAML config
+   * - If table is empty: Load all from YAML
+   * - If table has data: Add only NEW libraries from YAML (merge)
+   */
+  private async checkAndLoadLibraries(): Promise<void> {
+    try {
+      const existingLibraries = await this.getLibraries();
+      
+      if (existingLibraries.length === 0) {
+        console.log('Library table is empty, loading from config.yaml...');
+        await this.loadLibrariesFromConfig();
+      } else {
+        console.log(`Found ${existingLibraries.length} existing libraries in database`);
+        await this.syncLibrariesFromYAML(existingLibraries);
+      }
+    } catch (error) {
+      console.error('Error checking libraries:', error);
+    }
+  }
+
+  /**
+   * Sync libraries from YAML - add only new ones that don't exist in DB
+   */
+  private async syncLibrariesFromYAML(existingLibraries: LibraryData[]): Promise<void> {
+    try {
+      const configPath = path.join(__dirname, "../config.yaml");
+
+      if (!existsSync(configPath)) {
+        console.log('No config.yaml found, skipping sync');
+        return;
+      }
+
+      const fileContents = readFileSync(configPath, "utf8");
+      const config = load(fileContents) as any;
+
+      // Basic validation
+      if (!config?.library || !Array.isArray(config.library)) {
+        console.log('Invalid config.yaml format, skipping sync');
+        return;
+      }
+
+      const existingNames = new Set(
+        existingLibraries.map(lib => lib.name.toLowerCase())
+      );
+      const existingFiles = new Set(
+        existingLibraries.map(lib => lib.file.toLowerCase())
+      );
+
+      const newLibraries: LibraryData[] = [];
+
+      // Check each YAML entry
+      for (const entry of config.library) {
+        if (!entry.name || !entry.file || !entry.platform) {
+          continue;
+        }
+
+        const nameLower = entry.name.trim().toLowerCase();
+        const fileLower = entry.file.trim().toLowerCase();
+
+        // Only add if not already in database
+        if (!existingNames.has(nameLower) && !existingFiles.has(fileLower)) {
+          const normalizedPlatform = entry.platform.toLowerCase() === 'ios' ? 'iOS' : 'Android';
+          
+          newLibraries.push({
+            name: entry.name.trim(),
+            file: entry.file.trim(),
+            platform: normalizedPlatform
+          });
+        }
+      }
+
+      if (newLibraries.length > 0) {
+        for (const library of newLibraries) {
+          await this.createNewLibrary(library);
+        }
+        console.log(`Added ${newLibraries.length} new libraries from config.yaml`);
+      } else {
+        console.log('No new libraries to add from config.yaml');
+      }
+
+    } catch (error) {
+      console.error('Error syncing libraries from YAML:', error instanceof Error ? error.message : String(error));
+    }
   }
 
   /**

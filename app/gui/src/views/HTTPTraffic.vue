@@ -313,14 +313,19 @@ export default defineComponent({
                 // tmpData += "\nHost: " + element.host
                 // console.log(element);
                 // console.log(element.request_body);
-                if(data.request_body) {
+                if(data.request_body && data.request_body.trim()) {
                     if(tmpJSONFlag) {
-                        tmpData += "\n\n" + JSON.stringify(JSON.parse(data.request_body), null, 2);
+                        try {
+                            tmpData += "\n\n" + JSON.stringify(JSON.parse(data.request_body), null, 2);
+                        } catch (e) {
+                            console.warn("[DEBUG] Failed to parse request_body as JSON:", e);
+                            tmpData += "\n\n" + data.request_body;
+                        }
                     } else {
                         tmpData += "\n\n" + data.request_body
                     }
                 } else {
-                    tmpData += "\n\n " 
+                    tmpData += "\n\n "
                 }
                 
                 var tmpRequestContent = tmpData
@@ -347,7 +352,12 @@ export default defineComponent({
                     tmpData = t_httpVersion + " " + data.status_code + " " + httpStatusCodes[data.status_code] + "\n" + tmpData;
                 }
                 if(newJSONFlag) {
-                    tmpData += "\n\n" + JSON.stringify(JSON.parse(data.response_body), null, 2);
+                    try {
+                        tmpData += "\n\n" + JSON.stringify(JSON.parse(data.response_body), null, 2);
+                    } catch (e) {
+                        console.warn("[DEBUG] Failed to parse response_body as JSON:", e);
+                        tmpData += "\n\n" + data.response_body;
+                    }
                 } else {
                     tmpData += "\n\n" + data.response_body
                 }
@@ -407,7 +417,12 @@ export default defineComponent({
                 // console.log(element.request_body);
                 if(element.request_body) {
                     if(tmpJSONFlag) {
-                        tmpData += "\n\n" + JSON.stringify(JSON.parse(element.request_body), null, 2);
+                        try {
+                            tmpData += "\n\n" + JSON.stringify(JSON.parse(element.request_body), null, 2);
+                        } catch (e) {
+                            console.warn("[DEBUG] Failed to parse request_body as JSON:", e);
+                            tmpData += "\n\n" + element.request_body;
+                        }
                     } else {
                         tmpData += "\n\n" + element.request_body
                     }
