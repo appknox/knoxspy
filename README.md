@@ -11,6 +11,7 @@
 <img src="https://img.shields.io/badge/Language-TypeScript%20%7C%20JavaScript-blue" alt="Language">
 <img src="https://img.shields.io/badge/License-Apache%202.0-yellow" alt="License">
 <img src="https://img.shields.io/badge/DEF%20CON-33-black" alt="DEF CON">
+<img src="https://img.shields.io/badge/Black%20Hat-EU%202025-red" alt="Black Hat EU 2025">
 
 </div>
 
@@ -35,16 +36,24 @@ Traditional proxy tools like **Burp Suite** fail when dealing with:
 
 ### 🔥 **Advanced Interception**
 - **Runtime Hooking**: Bypass certificate pinning and security restrictions
-- **Multi-Platform**: Android (OkHttp3) and iOS (Alamofire/AFNetworking) support
+- **Multi-Platform**: Android (OkHttp3, Flutter) and iOS (Alamofire/AFNetworking) support
 - **Real-Time Analysis**: Live traffic capture and analysis
+- **Multi-User Support**: Android work profiles and secondary user support
 
 ### 🛠️ **Professional Toolkit**
 - **Traffic Replay**: Replay captured requests for testing
+- **Request Repeater**: Modify and replay captured requests with multi-tab support
 - **Session Management**: Multiple concurrent testing sessions
 
 ### 🎨 **Modern Interface**
 - **Vue.js Frontend**: Responsive, intuitive web interface
 - **WebSocket Integration**: Real-time updates and communication
+- **Keyboard Shortcuts**: Quick actions (Cmd+L sidebar, Cmd+F search, Cmd+D replay)
+
+### 📱 **Flutter Support**
+- **Flutter HTTP**: Intercept traffic from Flutter apps using the http package
+- **Flutter DIO**: Support for Flutter apps using the Dio HTTP client
+- **Cross-Platform**: Works with Flutter apps on Android devices
 
 ---
 
@@ -121,6 +130,8 @@ cd ../..
 | Platform | Library | Coverage |
 |----------|---------|----------|
 | Android | OkHttp3 | ✅ Full Support |
+| Android | Flutter HTTP | ✅ Full Support |
+| Android | Flutter DIO | ✅ Full Support |
 | iOS | Alamofire | ✅ Full Support |
 | iOS | AFNetworking | ✅ Full Support |
 | Custom | User Scripts | ✅ Extensible |
@@ -131,6 +142,7 @@ Upload your own Frida agents as ZIP files:
 - TypeScript source automatically compiled
 - Stored in `libraries/` directory
 - Database tracking for metadata
+- Pre-configured libraries loaded from `config.yaml` at startup
 
 ---
 
@@ -146,6 +158,23 @@ Upload your own Frida agents as ZIP files:
 - **Certificate pinning bypass demonstrations**
 - **Custom agent deployment**
 - **Enterprise application security testing**
+
+---
+
+## 🎩 **Black Hat EU 2025**
+
+### 🚀 **New Capabilities Showcase**
+KnoxSpy returns to the stage at Black Hat Europe 2025 with powerful new features:
+
+- **Flutter Application Support**: Full interception capabilities for Flutter apps using HTTP and DIO libraries
+- **Request Repeater**: Capture, modify, and replay network requests with an intuitive multi-tab interface
+- **Android Multi-User Support**: Seamlessly analyze apps across work profiles and secondary users
+- **Enhanced UI**: Modern Vue.js 3 interface with keyboard shortcuts for power users
+
+### 🔬 **Research Highlights**
+- **Cross-Framework Analysis**: Breaking the barriers of Flutter's custom networking stack
+- **Enterprise MDM Evolution**: Updated techniques for modern MDM security testing
+- **Real-Time Traffic Manipulation**: Live request modification and replay demonstrations
 
 ---
 
