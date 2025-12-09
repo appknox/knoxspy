@@ -375,7 +375,16 @@ class WebSocketClient {
 	}
 
 	private async handleLibraryList(data: any): Promise<void> {
-		const libraries = await this.dbManager.getLibraries();
+		const allLibraries = await this.dbManager.getLibraries();
+
+		// Filter libraries by platform if specified
+		let libraries = allLibraries;
+		if (data.platform) {
+			// Normalize platform name: "iPhone OS" -> "iOS", "Android" -> "Android"
+			const normalizedPlatform = data.platform === "iPhone OS" ? "iOS" : data.platform;
+			libraries = allLibraries.filter(lib => lib.platform === normalizedPlatform);
+		}
+
 		this.send({
 			action: WebSocketResponses.RSP_LIBRARY_LIST,
 			libraries: libraries,

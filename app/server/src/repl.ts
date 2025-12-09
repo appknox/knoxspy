@@ -223,7 +223,22 @@ class REPLManager {
 		
 		try {
 			const script = await this.session!.createScript(fileContent);
-			
+
+			// Enable console output from Frida script
+			script.logHandler = (level, text) => {
+				const logPrefix = `[Frida Script ${level.toUpperCase()}]`;
+				console.log(`${logPrefix} ${text}`);
+
+				// Broadcast script logs to frontend
+				this.ws.broadcastData(
+					JSON.stringify({
+						action: "script.log",
+						level: level,
+						message: text,
+					})
+				);
+			};
+
 			script.message.connect((message, data) => {
 				console.log("Script Message: " + message.type);
 				if (message.type === MessageType.Error) {
