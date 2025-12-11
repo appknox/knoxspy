@@ -11,7 +11,7 @@ function httpRequest(input) {
     } = input;
 
     const url = `${protocol}://${host}${endpoint}`;
-	console.log("[*] URL: " + url);
+    console.log("[*] URL: " + url);
     const NSString = ObjC.classes.NSString;
     const NSURL = ObjC.classes.NSURL;
     const NSMutableURLRequest = ObjC.classes.NSMutableURLRequest;
@@ -21,14 +21,14 @@ function httpRequest(input) {
     const NSDictionary = ObjC.classes.NSDictionary;
     const NSArray = ObjC.classes.NSArray;
 
-	const nsStr = NSString.stringWithUTF8String_(Memory.allocUtf8String(url));
-	const nsURL = NSURL.URLWithString_(nsStr);
+    const nsStr = NSString.stringWithUTF8String_(Memory.allocUtf8String(url));
+    const nsURL = NSURL.URLWithString_(nsStr);
 
     const request = NSMutableURLRequest.requestWithURL_(nsURL);
-	const methodPtr = Memory.allocUtf8String(method);
-	const nsMethod = NSString.stringWithUTF8String_(methodPtr);
-	console.log("Setting HTTP Method: " + nsMethod);
-	request.setHTTPMethod_(nsMethod);
+    const methodPtr = Memory.allocUtf8String(method);
+    const nsMethod = NSString.stringWithUTF8String_(methodPtr);
+    console.log("Setting HTTP Method: " + nsMethod);
+    request.setHTTPMethod_(nsMethod);
 
     // // --- Headers ---
     const headersArray = JSON.parse(request_headers); // Expecting: ["Header: Value", ...]
@@ -38,7 +38,7 @@ function httpRequest(input) {
         const val = valParts.join(":").trim();
         headerDict[key.trim()] = val;
     });
-	console.log("Headers: " + JSON.stringify(headerDict));
+    console.log("Headers: " + JSON.stringify(headerDict));
 
     const headerObj = ObjC.classes.NSMutableDictionary.alloc().init();
     for (const key in headerDict) {
@@ -65,10 +65,10 @@ function httpRequest(input) {
             retType: 'void',
             argTypes: ['object', 'object', 'object'],
             implementation: function (data, response, error) {
-				const payload = Object.assign({}, input);
-				payload.status_code = '';
-				payload.response_body = '';
-				payload.response_headers = '';
+                const payload = Object.assign({}, input);
+                payload.status_code = '';
+                payload.response_body = '';
+                payload.response_headers = '';
 
                 if (error && !error.isNull()) {
                     const errObj = new ObjC.Object(error);
@@ -78,33 +78,50 @@ function httpRequest(input) {
 
                 if (response && !response.isNull()) {
                     const res = new ObjC.Object(response);
-					try {
-						payload.status_code = res.statusCode().toString();
-						console.log("Status Code: " + payload.status_code);
+                    try {
+                        payload.status_code = res.statusCode().toString();
+                        console.log("Status Code: " + payload.status_code);
 
-						const headers = res.allHeaderFields();
-						const headerDict = new ObjC.Object(headers);
-						const keys = headerDict.allKeys();
-						const count = keys.count();
-						const headerList = [];
+                        const headers = res.allHeaderFields();
+                        const headerDict = new ObjC.Object(headers);
+                        const keys = headerDict.allKeys();
+                        const count = keys.count();
+                        const headerList = [];
 
-						for (let i = 0; i < count; i++) {
-							const key = keys.objectAtIndex_(i).toString();
-							const value = headerDict.objectForKey_(keys.objectAtIndex_(i)).toString();
-							headerList.push(`${key}: ${value}`);
-						}
-						payload.response_headers = JSON.stringify(headerList);
-						console.log("Response Headers: " + payload.response_headers);
-					} catch (e) {
-						console.error("Error processing response headers:", e);
-						console.log(e);
-					}
+                        for (let i = 0; i < count; i++) {
+                            const key = keys.objectAtIndex_(i).toString();
+                            const value = headerDict.objectForKey_(keys.objectAtIndex_(i)).toString();
+                            headerList.push(`${key}: ${value}`);
+                        }
+                        payload.response_headers = JSON.stringify(headerList);
+                        console.log("Response Headers: " + payload.response_headers);
+                    } catch (e) {
+                        console.error("Error processing response headers:", e);
+                        console.log(e);
+                    }
                 }
 
                 if (data && !data.isNull()) {
                     const nsData = new ObjC.Object(data);
-                    const str = nsData.bytes().readUtf8String(nsData.length());
-                    payload.response_body = str;
+                    const length = nsData.length();
+                    try {
+                        // Try to read as UTF-8 text
+                        const str = nsData.bytes().readUtf8String(length);
+                        payload.response_body = str;
+                    } catch (e) {
+                        // Binary data - return hex preview like the interception agent
+                        try {
+                            const bytes = nsData.bytes();
+                            const preview = [];
+                            const previewLen = Math.min(64, length);
+                            for (let i = 0; i < previewLen; i++) {
+                                preview.push(bytes.add(i).readU8().toString(16).padStart(2, '0'));
+                            }
+                            payload.response_body = `[Binary ${length} bytes: ${preview.join(' ')}${length > previewLen ? '...' : ''}]`;
+                        } catch (e2) {
+                            payload.response_body = `[Binary ${length} bytes - unable to preview]`;
+                        }
+                    }
                 }
 
                 send(JSON.stringify(payload));
@@ -116,25 +133,25 @@ function httpRequest(input) {
 }
 
 const input = {
-  id: 42,
-  protocol: 'https',
-  host: 'jsonplaceholder.typicode.com',
-  status_code: '',
-  response_body: '',
-  response_headers: '',
-  session_id: 15,
-  method: 'GET',
-  endpoint: '/todos/1',
-  request_headers: '["Host: jsonplaceholder.typicode.com","Content-Type: application/json"]',
-  request_body: ''
+    id: 42,
+    protocol: 'https',
+    host: 'jsonplaceholder.typicode.com',
+    status_code: '',
+    response_body: '',
+    response_headers: '',
+    session_id: 15,
+    method: 'GET',
+    endpoint: '/todos/1',
+    request_headers: '["Host: jsonplaceholder.typicode.com","Content-Type: application/json"]',
+    request_body: ''
 };
 
-recv('data', function(message) {
-	const input = message.payload;
-	console.log("[*] Received message: " + JSON.stringify(input));
-	httpRequest(input);
-	
-	// ObjC.schedule(ObjC.mainQueue, function () {
+recv('data', function (message) {
+    const input = message.payload;
+    console.log("[*] Received message: " + JSON.stringify(input));
+    httpRequest(input);
+
+    // ObjC.schedule(ObjC.mainQueue, function () {
     // try {
     // } catch (e) {
     //     console.error("Error processing request:", e);

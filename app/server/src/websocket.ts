@@ -20,7 +20,7 @@ enum WebSocketAction {
 	SESSION_CLEAR = "session.clear",
 
 	TRAFFIC_INIT = "traffic.init",
-	
+
 	REPEATER_INIT = "repeater.init",
 	REPEATER_ADD = "repeater.add",
 	REPEATER_DUPLICATE = "repeater.duplicate",
@@ -28,22 +28,22 @@ enum WebSocketAction {
 	REPEATER_UPDATE = "repeater.update",
 	REPEATER_REPLAY = "repeater.replay",
 	REPEATER_TAB_UPDATE = "repeater.tab.update",
-	
+
 	DEVICES_INIT = "devices.init",
 	DEVICES_REFRESH = "devices.refresh",
-	
+
 	APPS_INIT = "apps.init",
 	APPS_REFRESH = "apps.refresh",
 	APP_SPAWN = "app.spawn",
 	APP_ATTACH = "app.attach",
 	APP_DISCONNECT = "app.disconnect",
-	
+
 	CONNECTION_CLEAR = "connection.clear",
 
 	LIBRARY_CHANGE = "library.change",
 	LIBRARY_LIST = "library.list",
 	LIBRARY_DELETE = "library.delete",
-	
+
 
 	ERROR_GENERAL = "error.general",
 	JSON_ERROR = "error.json",
@@ -83,7 +83,7 @@ interface WebSocketResponse {
 }
 
 // Global active session for all clients
-let activeSession: SessionInfo = { session: null, app: null, status: false, channel: null};
+let activeSession: SessionInfo = { session: null, app: null, status: false, channel: null };
 
 // Query params for dashboard every time an app is spawned or attached
 let dashboardQueryParams: DashboardQueryParams = {
@@ -166,7 +166,7 @@ class WebSocketClient {
 	 * Clear the active session
 	 */
 	private clearActiveSession(): void {
-		activeSession = { session: null, app: null, status: false, channel: null};
+		activeSession = { session: null, app: null, status: false, channel: null };
 	}
 
 	/**
@@ -353,21 +353,20 @@ class WebSocketClient {
 				error
 			);
 			this.sendError(
-				`Failed to handle request: ${
-					error instanceof Error ? error.message : String(error)
+				`Failed to handle request: ${error instanceof Error ? error.message : String(error)
 				}`
 			);
 		}
 	}
 
 	private async handleConnectionClear(data: any): Promise<void> {
-		
+
 	}
 
 	private async handleLibraryChange(data: any): Promise<void> {
 		const tmpLibrary = data.library.file;
 		if (!activeSession) {
-			return this.sendError("No active session"); 
+			return this.sendError("No active session");
 		}
 		activeSession.app!.library = tmpLibrary;
 		const repl = new REPLManager(activeSession, this.manager, this.dbManager);
@@ -407,13 +406,13 @@ class WebSocketClient {
 	}
 
 	private async handleAppSpawn(data: any): Promise<void> {
-		if(activeSession.channel) {
+		if (activeSession.channel) {
 			activeSession.channel.disconnect();
 			console.log("[handleAppSpawn] Disconnected active session");
 		}
 
 		let result = await fridaManager.launchApp(data.deviceId, data.appId, data.user);
-		if(!result.status) {
+		if (!result.status) {
 			this.sendError(result.error?.toString() || "Failed to launch app");
 			return;
 		}
@@ -464,12 +463,12 @@ class WebSocketClient {
 		const deviceId = data.deviceId;
 		let t_process = [];
 
-		if(platform.toLowerCase() === "android") {
+		if (platform.toLowerCase() === "android") {
 			t_process = await fridaManager.findProcessPidsByUid(deviceId, appName, parseInt(user));
 		} else {
 			t_process = await fridaManager.findProcesses(deviceId, appName);
 		}
-		if(!t_process.length) {
+		if (!t_process.length) {
 			this.sendError("Process not found");
 			return;
 		}
@@ -524,7 +523,7 @@ class WebSocketClient {
 		let devices: DeviceInfo[] = [];
 		for (let device of devicesData) {
 			let users = [];
-			if(device.platform.toLowerCase() == "android") {
+			if (device.platform.toLowerCase() == "android") {
 				users = await fridaManager.getAndroidUsersInfo(device.id);
 			} else {
 				users = await fridaManager.getApplications(device.id);
@@ -616,7 +615,7 @@ class WebSocketClient {
 		let devices: DeviceInfo[] = [];
 		for (let device of devicesData) {
 			let users = [];
-			if(device.platform.toLowerCase() == "android") {
+			if (device.platform.toLowerCase() == "android") {
 				users = await fridaManager.getAndroidUsersInfo(device.id);
 			} else {
 				users = await fridaManager.getApplications(device.id);
@@ -639,7 +638,7 @@ class WebSocketClient {
 		const t_device = data.device;
 		const t_platform = data.platform;
 		let users;
-		if(t_platform.toLowerCase() == "android") {
+		if (t_platform.toLowerCase() == "android") {
 			users = await fridaManager.getAndroidUsersInfo(t_device);
 		} else {
 			users = await fridaManager.getApplications(t_device);
@@ -653,7 +652,7 @@ class WebSocketClient {
 
 	private async handleAppDisconnect(data: any): Promise<void> {
 		console.log("[handleAppDisconnect] App disconnected");
-		if(activeSession.channel) {
+		if (activeSession.channel) {
 			activeSession.channel.disconnect();
 		}
 		activeSession = { session: null, app: null, status: false, channel: null };
@@ -726,13 +725,28 @@ class WebSocketClient {
 				: "iOS_makeAPIRequest.js";
 
 		try {
-			// Find the process
-			const deviceId = activeSession!.app!.deviceId;
-			const appName = activeSession!.app!.name;
+			// Check if we already have an active session
+			if (activeSession.session && activeSession.status) {
+				console.log("Reusing existing active session for replay");
+
+				// Create REPL manager and attach the script using the existing session
+				const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+				await repl.attach_script(library, replayPayload, this.manager);
+				return;
+			}
+
+			// No active session, need to find and attach to the process
+			const deviceId = activeSession?.app?.deviceId;
+			const appName = activeSession?.app?.name;
+
+			if (!deviceId || !appName) {
+				return this.sendError("No active app connection. Please spawn or attach to an app first.");
+			}
+
 			console.log("Searching for process", deviceId, appName);
 			let processes = [];
-			
-			if(platform.toLowerCase() === "android") {
+
+			if (platform.toLowerCase() === "android") {
 				processes = await fridaManager.findProcessPidsByUid(deviceId, appName, parseInt(user));
 				console.log("Found PIDs", processes);
 			} else {
@@ -743,7 +757,7 @@ class WebSocketClient {
 				console.log("Found process", processes);
 			}
 
-			if(!processes.length) {
+			if (!processes.length) {
 				return this.sendError("App not running");
 			}
 
@@ -753,6 +767,7 @@ class WebSocketClient {
 			const session = await fridaManager.attachToApp(deviceId, processId);
 
 			activeSession.session = session;
+			activeSession.status = true;
 
 			console.log("Replay payload:", replayPayload);
 
@@ -762,8 +777,7 @@ class WebSocketClient {
 		} catch (error) {
 			console.error("Error replaying request:", error);
 			this.sendError(
-				`Failed to replay request: ${
-					error instanceof Error ? error.message : String(error)
+				`Failed to replay request: ${error instanceof Error ? error.message : String(error)
 				}`
 			);
 		}
@@ -782,7 +796,7 @@ class WebSocketClient {
 
 	private async sessionEventCallback(session: SessionInfo): Promise<void> {
 		console.log(`Session event: connected=${session.status}, session=`, session);
-		if(session.status === true && session.session) {
+		if (session.status === true && session.session) {
 			console.log("Session connected");
 			activeSession = { session: session.session, app: session.app, status: true, channel: session.channel };
 			await fridaManager.saveActiveSession(session.session);
