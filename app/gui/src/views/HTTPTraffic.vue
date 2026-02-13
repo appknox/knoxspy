@@ -79,7 +79,7 @@
                     </a>
                 </template>
             </TabMenu>
-            <Splitter class="repeater-viewer-split">
+            <Splitter v-if="activeRepeaterData" class="repeater-viewer-split">
                 <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
                     <codemirror
                         v-model="activeRepeaterData.requestContent"
@@ -451,7 +451,12 @@ export default defineComponent({
                 }
 
                 if(tmpJSONFlag) {
-                    tmpData += "\n\n" + JSON.stringify(JSON.parse(element.response_body), null, 2);
+                    try {
+                        tmpData += "\n\n" + JSON.stringify(JSON.parse(element.response_body), null, 2);
+                    } catch (e) {
+                        console.warn("[DEBUG] Failed to parse response_body as JSON:", e);
+                        tmpData += "\n\n" + element.response_body;
+                    }
                 } else {
                     tmpData += "\n\n" + element.response_body
                 }

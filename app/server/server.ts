@@ -69,6 +69,13 @@ async function checkZipEntries(zipFilePath: string): Promise<string[]> {
  */
 async function compileFridaAgent(folderPath: string): Promise<void> {
 	try {
+		// Install dependencies first (needed for @types/frida-gum)
+		// Skip prepare/build scripts to avoid environment-specific commands
+		console.log("Installing agent dependencies...");
+		execSync(`cd ${folderPath} && npm install --ignore-scripts`, { timeout: 60000 });
+
+		// Compile the agent
+		console.log("Compiling Frida agent...");
 		const result = execSync(
 			`cd ${folderPath} && frida-compile -o ${path.join(folderPath, "_library.js")} agent/index.ts`,
 			{ timeout: 30000 }

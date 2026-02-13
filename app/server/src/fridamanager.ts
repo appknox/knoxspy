@@ -339,9 +339,9 @@ export class FridaManager {
 		user: string
 	): Promise<OutputResult<frida.Session>> {
 		if (this.activeSession) {
-			console.log("Active session already exists. Will try to attach to app instead!");
+			console.log("Active session exists but will be disconnected. Proceeding with spawn...");
 		}
-			
+
 		const tmpOutput: OutputResult<frida.Session> = {
 			output: null as unknown as frida.Session,
 			status: false,
@@ -354,8 +354,18 @@ export class FridaManager {
 				throw new Error(`Device with ID ${deviceId} not found`);
 			}
 
-			const pid = await device.spawn(appId, { uid: parseInt(user)} );
-			device.resume(pid);
+			// Get device platform to determine spawn options
+			const platform = await this.getDevicePlatform(device);
+
+			// For iOS, don't pass uid (iOS doesn't support multi-user)
+			// For Android, pass uid if user is not -1
+			const spawnOptions: any = {};
+			if (platform === "Android" && user !== "-1") {
+				spawnOptions.uid = parseInt(user);
+			}
+
+			const pid = await device.spawn(appId, spawnOptions);
+			await device.resume(pid);
 			const session = await device.attach(pid);
 
 			// Store session for later cleanup
