@@ -111,7 +111,23 @@ export class FridaManager {
 	async getDeviceUserApplications(device: any, user: any): Promise<AppsDetails[]> {
 		let t_packages: AppsDetails[] = [];
 		try {
-			const t_fetched_packages = await device.getPackages("--user " + user.id + " -3");
+			let t_fetched_packages: string[] = [];
+			const pmArgs = `--user ${user.id} -3`;
+			try {
+				// Work profile package listing requires elevated shell access on many devices.
+				const raw = await device
+					.shell(`su -c 'pm list packages ${pmArgs}'`)
+					.then(Adb.util.readAll)
+					.then((output: Buffer) => output.toString());
+				t_fetched_packages = raw
+					.split("\n")
+					.map((line: string) => line.trim())
+					.filter((line: string) => line.startsWith("package:"))
+					.map((line: string) => line.replace(/^package:/, ""));
+			} catch (suError) {
+				// Fallback for devices where `su` is unavailable.
+				t_fetched_packages = await device.getPackages(pmArgs);
+			}
 			for (const pkg of t_fetched_packages) {
 				t_packages.push({
 					icon: "",
