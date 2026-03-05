@@ -1,7 +1,7 @@
-import * as frida from 'frida';
-import { DeviceManager, Session, SessionDetachReason } from 'frida';
+import type { DeviceChangedHandler, DeviceManager, Session, SessionDetachReason } from "frida";
 import WebSocketManager from './websocket';
 import { SessionInfo, App } from './types';
+import { getFridaRuntime } from "./frida-loader";
 
 /**
  * Message structure for WebSocket communication
@@ -26,7 +26,7 @@ interface ChannelMessage {
  */
 export default class Channels {
 	private session: Session;
-	private changedSignal!: frida.DevicesChangedHandler;
+	private changedSignal!: DeviceChangedHandler;
 	private name: string;
 	private sessionId: string;
 	private appId: string;
@@ -37,7 +37,7 @@ export default class Channels {
 	private ws: WebSocketManager;
 	private processId: number;
 	private connected: boolean = false;
-	private deviceManager: DeviceManager;
+	private deviceManager: DeviceManager | null = null;
 	private sessionCallback: (sessionInfo: SessionInfo) => void;
 
 	/**
@@ -77,7 +77,6 @@ export default class Channels {
 		this.user = user;
 		this.ws = ws;
 		this.processId = processId;
-		this.deviceManager = frida.getDeviceManager();
 		this.sessionCallback = sessionCallback;
 		
 		console.log(`Channel for ${name} has been set up!`);
@@ -108,7 +107,7 @@ export default class Channels {
 	 */
 	public disconnect(): void {
 		try {
-			if (this.connected && this.changedSignal) {
+			if (this.connected && this.changedSignal && this.deviceManager) {
 				this.deviceManager.changed.disconnect(this.changedSignal);
 				this.connected = false;
 				
@@ -127,11 +126,21 @@ export default class Channels {
 	/**
 	 * Connect to device manager events and set up session monitoring
 	 */
-	public connect(): void {
+	private async ensureDeviceManager(): Promise<DeviceManager> {
+		if (!this.deviceManager) {
+			const frida = await getFridaRuntime();
+			this.deviceManager = frida.getDeviceManager();
+		}
+
+		return this.deviceManager;
+	}
+
+	public async connect(): Promise<void> {
 		try {
+			const deviceManager = await this.ensureDeviceManager();
 			// Bind the onchange handler and connect to device manager events
 			this.changedSignal = this.onchange.bind(this);
-			this.deviceManager.changed.connect(this.changedSignal);
+			deviceManager.changed.connect(this.changedSignal);
 			this.connected = true;
 			
 			// Notify that the channel is connected

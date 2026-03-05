@@ -1,5 +1,4 @@
-import { Session, Script } from "frida";
-import { MessageType } from "frida/dist/script";
+import type { Session, Message, ErrorMessage, SendMessage } from "frida";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import DBManager from "./database";
@@ -22,6 +21,14 @@ class REPLManager {
 		console.log("REPL Constructor called!");
 	}
 
+	private isErrorMessage(message: Message): message is ErrorMessage {
+		return message.type === "error";
+	}
+
+	private isSendMessage(message: Message): message is SendMessage {
+		return message.type === "send";
+	}
+
 	async detect_platform(): Promise<void> {
 		console.log("Got request for checking device platform");
 		const parentDir = path.join(__dirname, "..");
@@ -37,9 +44,9 @@ class REPLManager {
 		try {
 			const script = await this.session!.createScript(fileContent);
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -49,7 +56,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload } = message;
 					this.ws.broadcastData(
 						JSON.stringify({ action: "detectPlatform", message: payload })
@@ -84,9 +91,9 @@ class REPLManager {
 		try {
 			const script = await this.session!.createScript(fileContent);
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -96,7 +103,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload } = message;
 					try {
 						const tmpJson = JSON.parse(payload);
@@ -145,9 +152,9 @@ class REPLManager {
 		try {
 			const script = await this.session!.createScript(fileContent);
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -157,7 +164,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload: messagePayload } = message;
 					try {
 						const tmpJson = JSON.parse(messagePayload);
@@ -224,9 +231,9 @@ class REPLManager {
 		try {
 			const script = await this.session!.createScript(fileContent);
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -236,7 +243,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload: messagePayload } = message;
 					try {
 						const tmpJson = JSON.parse(messagePayload);

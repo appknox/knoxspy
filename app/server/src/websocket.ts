@@ -3,7 +3,6 @@ import { Server as HttpServer } from "http";
 import DBManager from "./database";
 import { FridaManager } from "./fridamanager";
 import Channels from "./channels";
-import { Session } from "frida";
 import REPLManager from "./repl";
 import { DeviceDetails, SessionInfo, App, DashboardData, DeviceInfo, AppsDetails, DashboardQueryParams } from "./types";
 
@@ -433,7 +432,7 @@ class WebSocketClient {
 			data.sessionId
 		);
 
-		channel.connect();
+		await channel.connect();
 
 		activeSession = { session: session, app: t_app, status: true, channel: channel };
 		await fridaManager.saveActiveSession(session);
@@ -493,7 +492,7 @@ class WebSocketClient {
 			data.sessionId
 		);
 
-		channel.connect();
+		await channel.connect();
 
 		activeSession = { session: session, app: t_app, status: true, channel: channel };
 		await fridaManager.saveActiveSession(session);
