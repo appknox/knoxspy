@@ -293,11 +293,15 @@ export class FridaManager {
 	 * @param targetUid The user ID to filter by
 	 * @returns List of process PIDs
 	 */
-	async findProcessPidsByUid(deviceId: string, appName: string, targetUid: number): Promise<Array<{ pid: string }>> {
+	async findProcessPidsByUid(
+		deviceId: string,
+		appName: string,
+		targetUid: number
+	): Promise<Array<{ pid: string; name: string }>> {
 		const device = client.getDevice(deviceId);
 
-		// Filter ps output for processes whose USER column starts with u{targetUid}_
-		const shellCmd = `ps -A | grep ${appName} | grep -E "^u${targetUid}_"`;
+		// Pull all processes for the target Android user, then filter in JS.
+		const shellCmd = `ps -A | grep -E "^u${targetUid}_"`;
 
 		return device.shell(shellCmd)
 			.then(Adb.util.readAll)
@@ -308,13 +312,19 @@ export class FridaManager {
 					return [];
 				}
 
-				// Extract PID from column 2 (index 1) of each line
-				const pids = lines.map(line => {
+				// Typical Android ps format:
+				// USER PID PPID VSZ RSS WCHAN ADDR S NAME
+				const processes = lines
+				.map(line => {
 					const parts = line.trim().split(/\s+/);
-					return { pid: parts[1] }; // PID column
-				});
+					const pid = parts[1];
+					const name = parts[parts.length - 1];
+					return { pid, name };
+				})
+				.filter((proc) => !!proc.pid && !!proc.name)
+				.filter((proc) => proc.name === appName || proc.name.startsWith(appName + ":"));
 
-				return pids;
+				return processes;
 			});
 	}
 

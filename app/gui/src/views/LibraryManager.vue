@@ -137,7 +137,7 @@
                             </template>
                         </StepperPanel>
                         <StepperPanel header="Finalising Setup" style="height: 400px;">
-                            <template #content="{ prevCallback }">
+                            <template #content>
                                 <div class="flex flex-column h-12rem">
                                     <div class="border-2 border-dashed surface-border border-round surface-ground flex-auto flex justify-content-center align-items-center font-medium">
                                         <div v-if="librarySetupDone == false" class="card">
@@ -305,7 +305,7 @@ export default defineComponent({
             const json = {"action":"library.list"}
             this.ws.send(JSON.stringify(json))
         },
-        changeSelectedPlatform(event: any) {
+        changeSelectedPlatform() {
             this.isNextButtonDisabled = (this.selectedPlatform == "") || (this.libraryNameValue.trim() == "");
         },
         onStepperChanged(event: any) {

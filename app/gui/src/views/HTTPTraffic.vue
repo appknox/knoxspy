@@ -1,8 +1,33 @@
 <template>
     <div class="page">
         <Toast />
-        <div style="display: flex; align-items: center; border-bottom: 1px solid #eee; position: relative;">
-            <SelectButton v-model="value" :options="options" @change="tabChanged($event)" :allow-empty="false" aria-labelledby="basic" style="position: absolute; left: 30px; top: 8px; z-index: 1000; text-align: center"/>
+        <div style="display: flex; align-items: center; border-bottom: 1px solid var(--surface-200); background-color: var(--surface-0); height: 48px; position: relative; padding-right: 160px;">
+            <div style="padding: 0 20px; border-right: 1px solid var(--surface-200); height: 100%; display: flex; align-items: center;">
+                <SelectButton v-model="value" :options="options" @change="tabChanged($event)" :allow-empty="false" aria-labelledby="basic" style="text-align: center" class="p-button-sm"/>
+            </div>
+
+            <template v-if="value == 'Repeater'">
+                <TabMenu v-model:activeIndex="activeRepeaterTab" :model="repeaterRows" :scrollable="true" @tab-change="changeRepeater" style="flex-grow: 1; border-bottom: none; overflow: hidden; min-width: 0;">
+                    <template #item="{ item, props }">
+                        <a v-ripple v-bind="props.action" class="repeater-tab-item flex align-items-center gap-2" @contextmenu="onRepeaterTabClick($event, item)">
+                            <span class="font-bold" style="text-wrap: nowrap;" @click="editRepeaterTabTitle($event, item)">{{ item.label }}</span>
+                            <i class="pi pi-times" style="font-size: 12px; display: none; margin-left: 5px" @click="removeTab($event, item)"></i>
+                        </a>
+                    </template>
+                </TabMenu>
+                
+                <div v-if="activeRepeaterData" style="display: flex; align-items: center; gap: 8px; padding: 0 15px; border-left: 1px solid var(--surface-200); height: 100%; min-width: 150px; justify-content: flex-end; background-color: var(--surface-0);">
+                    <Button icon="pi pi-chevron-left" class="p-button-text p-button-sm p-button-secondary" @click="navigateHistory(-1)" :disabled="activeRepeaterData.historyIndex <= 0" style="padding: 0; width: 24px; height: 24px;" />
+                    <span style="font-family: 'Fira Code', monospace; font-size: 11px; color: var(--surface-600); min-width: 45px; text-align: center;">
+                        {{ (activeRepeaterData.historyIndex || 0) + 1 }} / {{ ((activeRepeaterData.history || []).length) + 1 }}
+                    </span>
+                    <Button icon="pi pi-chevron-right" class="p-button-text p-button-sm p-button-secondary" @click="navigateHistory(1)" :disabled="activeRepeaterData.historyIndex >= (activeRepeaterData.history || []).length" style="padding: 0; width: 24px; height: 24px;" />
+                    
+                    <div v-if="activeRepeaterData.historyIndex < (activeRepeaterData.history || []).length" v-tooltip.bottom="'You are viewing a historical snapshot'" style="margin-left: 5px; cursor: help;">
+                        <i class="pi pi-history" style="color: var(--orange-500); font-size: 14px;"></i>
+                    </div>
+                </div>
+            </template>
         </div>
 
         <Splitter v-if="value == 'Proxy'" style="height: calc(100vh - 50px)" layout="vertical" v-on:resize="resizedSplitter">
@@ -71,16 +96,15 @@
                 </template>
             </ConfirmPopup>
 
-            <TabMenu v-if="value == 'Repeater'" v-model:activeIndex="activeRepeaterTab" :model="repeaterRows" :scrollable="true"  @tab-change="changeRepeater" style="margin-left: 230px; margin-right: 130px;">
-                <template #item="{ item, props }">
-                    <a v-ripple v-bind="props.action" class="repeater-tab-item flex align-items-center gap-2" @contextmenu="onRepeaterTabClick($event, item)">
-                        <span class="font-bold" style="text-wrap: nowrap;" @click="editRepeaterTabTitle($event, item)">{{ item.label }}</span>
-                        <i class="pi pi-times" style="font-size: 12px; display: none; margin-left: 5px" @click="removeTab($event, item)"></i>
-                    </a>
-                </template>
-            </TabMenu>
             <Splitter class="repeater-viewer-split">
-                <SplitterPanel class="flex align-items-center justify-content-center"  :size="50">
+                <SplitterPanel class="flex align-items-center justify-content-center"  :size="50" style="position: relative;">
+                    <Button 
+                        icon="pi pi-copy" 
+                        class="p-button-text p-button-sm p-button-secondary copy-button" 
+                        @click="copyToClipboard(activeRepeaterData.requestContent, 'Request')" 
+                        v-tooltip.left="'Copy Request'"
+                        style="position: absolute; top: 10px; right: 15px; z-index: 10;" 
+                    />
                     <codemirror
                         v-model="activeRepeaterData.requestContent"
                         placeholder="Code goes here..."
@@ -91,7 +115,14 @@
                         :tab-size="2"
                     />
                 </SplitterPanel>
-                <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50">
+                <SplitterPanel class="flex align-items-center justify-content-center" :min-size="50":size="50" style="position: relative;">
+                    <Button 
+                        icon="pi pi-copy" 
+                        class="p-button-text p-button-sm p-button-secondary copy-button" 
+                        @click="copyToClipboard(activeRepeaterData.responseContent, 'Response')" 
+                        v-tooltip.left="'Copy Response'"
+                        style="position: absolute; top: 10px; right: 15px; z-index: 10;" 
+                    />
                     <codemirror
                         v-model="activeRepeaterData.responseContent"
                         style="width: calc(100% - 10px); height: calc(100vh - 105px); border: 0; margin: 5px; background-color: var(--surface-100); font-size: 13px"
@@ -105,8 +136,24 @@
                     <!-- <textarea style="text-align: left;" v-model="activeRepeaterData" id="code-viewer" class="code-viewer"></textarea> -->
                 </SplitterPanel>
             </Splitter>
-            <Button :disabled='platformName == "1"' label="Replay" style="position: fixed; top: 7px; right: 10px;" icon="pi pi-send" @click="replayRequest"  v-shortkey="['meta', 'd']" @shortkey.native="replayRequest" />
+            <Button :disabled='platformName == "1" || isReplaying' :label="isReplaying ? 'Replaying' : 'Replay'" style="position: fixed; top: 7px; right: 10px; width: 130px;" :icon="isReplaying ? 'pi pi-spin pi-spinner' : 'pi pi-send'" @click="replayRequest"  v-shortkey="['meta', 'd']" @shortkey.native="replayRequest" />
         </div>
+
+        <div v-if="value == 'Console'" style="height: calc(100vh - 50px); background-color: #1e1e1e; color: #d4d4d4; font-family: 'Fira Code', monospace; overflow-y: auto; padding: 10px; position: relative;">
+            <div style="position: sticky; top: 0; right: 0; display: flex; justify-content: flex-end; z-index: 10;">
+                <Button icon="pi pi-trash" severity="secondary" text @click="cs.clearScriptLogs()" v-tooltip.left="'Clear Logs'" />
+            </div>
+            <div v-if="cs.getScriptLogs.length === 0" style="display: flex; height: calc(100% - 40px); justify-content: center; align-items: center; flex-direction: column; color: #666;">
+                <i class="pi pi-info-circle" style="font-size: 40px; margin-bottom: 10px;"></i>
+                <p>No script logs yet. Attach a snippet to see its output here.</p>
+            </div>
+            <div v-for="(log, index) in cs.getScriptLogs" :key="index" style="margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 5px; font-size: 13px;">
+                <span style="color: #6a9955;">[{{ log.time }}]</span>
+                <span style="color: #4fc1ff; margin-left: 10px;">[{{ log.snippet }}]</span>
+                <div style="margin-left: 20px; white-space: pre-wrap; word-break: break-all; margin-top: 5px; color: #ce9178;">{{ typeof log.message === 'string' ? log.message : JSON.stringify(log.message, null, 2) }}</div>
+            </div>
+        </div>
+
         <Footer @dashboardReady="dashboardReady"></Footer>
     </div>
 </template>
@@ -135,7 +182,6 @@ import TabMenu from 'primevue/tabmenu';
 import Textarea from 'primevue/textarea';
 import Toolbar from 'primevue/toolbar';
 import { EditorView } from '@codemirror/view';
-import { HTTPParser } from 'http-parser-js';
 import {StreamLanguage} from '@codemirror/language';
 import {http} from '@codemirror/legacy-modes/mode/http';
 import ConfirmPopup from 'primevue/confirmpopup';
@@ -146,7 +192,6 @@ import langHTTP from 'highlight.js/lib/languages/http';
 import Footer from '../components/Footer.vue';
 import { httpStatusCodes } from '../constants';
 import ScrollPanel from 'primevue/scrollpanel';
-import { throwDeprecation } from 'process';
 
 hljs.registerLanguage('http', langHTTP);
 
@@ -164,7 +209,7 @@ export default defineComponent({
             selectedRepeaterTab: null,
             sess: null,
             value: 'Proxy',
-            options: ['Proxy', 'Repeater'],
+            options: ['Proxy', 'Repeater', 'Console'],
             message: '',
             codeMirrorOptions: {
                 extensions: [
@@ -216,10 +261,10 @@ export default defineComponent({
             library: this.$route.params.library as string,
             action: this.$route.params.action as string,
             isConnected: false,
-            didPageLoad: false
-        };
-    },
-    components: {
+            didPageLoad: false,
+            isReplaying: false
+            };
+            },    components: {
         ScrollPanel,
         Toast,
         Toolbar,
@@ -289,84 +334,49 @@ export default defineComponent({
                 console.log("Repeater init ack received", message.message);
                 let data = JSON.parse(message.message);
                 this.addRowsToRepeater(data, true);
+            } else if (message.action === 'repeater.history.ack') {
+                console.log("Repeater history ack received", message.id);
+                let history = JSON.parse(message.history);
+                const index = this.repeaterRows.findIndex(obj => obj.id === message.id);
+                if (index !== -1) {
+                    this.repeaterRows[index].history = history;
+                    this.repeaterRows[index].historyIndex = history.length; // Point to "live" data
+                }
             } else if (message.action === 'repeater.replay.ack') {
+                this.isReplaying = false;
                 let data = JSON.parse(message.replay);
-                const t_requestHeaders = JSON.parse(data.request_headers)
-                const t_responseHeaders = JSON.parse(data.response_headers)
-                const t_responseStatus = t_responseHeaders[0].split(" ")[0]
-                let t_httpVersion = "HTTP/1.1";
-                if(t_responseStatus === "H2") {
-                    t_httpVersion = "HTTP/2"
-                }
-                var tmpJSONFlag = false;
-                let t_request_headers = JSON.parse(data.request_headers);
-                t_request_headers.forEach((ele: any) => {
-                    if(ele.toLowerCase().startsWith("content-type")) {
-                        if(ele.indexOf("application/json")) {
-                            tmpJSONFlag = true;
-                        }
-                    }
-                })
                 
-                var tmpData = data.method + " " + data.endpoint + " " + t_httpVersion + "\n"
-                tmpData += t_request_headers.join("\n")
-                // tmpData += "\nHost: " + element.host
-                // console.log(element);
-                // console.log(element.request_body);
-                if(data.request_body && data.request_body.trim()) {
-                    if(tmpJSONFlag) {
-                        try {
-                            tmpData += "\n\n" + JSON.stringify(JSON.parse(data.request_body), null, 2);
-                        } catch (e) {
-                            console.warn("[DEBUG] Failed to parse request_body as JSON:", e);
-                            tmpData += "\n\n" + data.request_body;
-                        }
-                    } else {
-                        tmpData += "\n\n" + data.request_body
-                    }
-                } else {
-                    tmpData += "\n\n "
+                // Update history if this is the active tab
+                const repeaterIndex = this.repeaterRows.findIndex(obj => obj.id === data.id);
+                if (repeaterIndex !== -1) {
+                    if (!this.repeaterRows[repeaterIndex].history) this.repeaterRows[repeaterIndex].history = [];
+                    this.repeaterRows[repeaterIndex].history.push(data);
+                    this.repeaterRows[repeaterIndex].historyIndex = this.repeaterRows[repeaterIndex].history.length;
                 }
+
+                var tmpRequestContent = this.formatRequest(data);
+                var tmpResponseContent = this.formatResponse(data);
                 
-                var tmpRequestContent = tmpData
-                let t_response_headers = JSON.parse(data.response_headers);
-                tmpData = t_response_headers.join("\n")
-                var newJSONFlag = false;
-                var isHTTPResponseHeaderPresent = false;
-                t_response_headers.forEach((ele: any) => {
-                    console.log("For element:", ele);
-                    if(ele.toLowerCase().startsWith("content-type")) {
-                        console.log("Content-Type:", ele);
-                        if(ele.indexOf("application/json") > 0) {
-                            console.log("Element in final loop:", ele)
-                            newJSONFlag = true;
-                        }
-                    }
-                    if(ele.toLowerCase().startsWith("http/") || ele.toLowerCase().startsWith("h2")) {
-                        isHTTPResponseHeaderPresent = true;
-                    }
-                })
-                console.log("New flag value: ", newJSONFlag)
-                console.log("HTTP response header present: ", isHTTPResponseHeaderPresent, "Status:", data.status_code)
-                if(!isHTTPResponseHeaderPresent) {
-                    tmpData = t_httpVersion + " " + data.status_code + " " + httpStatusCodes[data.status_code] + "\n" + tmpData;
+                const oldTab = this.repeaterRows[repeaterIndex];
+                var tmpUpdatedRequest = {
+                    ...oldTab,
+                    id: data.id, 
+                    name: data.host + data.endpoint, 
+                    requestContent: tmpRequestContent, 
+                    responseContent: tmpResponseContent, 
+                    label: oldTab.label, 
+                    element: data
                 }
-                if(newJSONFlag) {
-                    try {
-                        tmpData += "\n\n" + JSON.stringify(JSON.parse(data.response_body), null, 2);
-                    } catch (e) {
-                        console.warn("[DEBUG] Failed to parse response_body as JSON:", e);
-                        tmpData += "\n\n" + data.response_body;
-                    }
-                } else {
-                    tmpData += "\n\n" + data.response_body
-                }
-                
-                var tmpResponseContent = tmpData
-                var tmpUpdatedRequest = {id: data.id, name: data.host + data.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: data.id, element: data}
                 this.activeRepeaterData = tmpUpdatedRequest;
-                var index = this.repeaterRows.findIndex(obj => obj.id === data.id)
-                this.repeaterRows[index] = tmpUpdatedRequest 
+                this.repeaterRows[repeaterIndex] = tmpUpdatedRequest 
+            } else if (message.action === 'script.error') {
+                this.isReplaying = false;
+                this.$toast.add({
+                    severity: 'error', 
+                    summary: 'Error', 
+                    detail: message.message, 
+                    life: 5000
+                });
             } else if (message.action === 'library.update.ack') {
                 this.cs.setSelectionKey("library", message.library);
             } else if (message.action === "repeater.delete.ack") {
@@ -380,6 +390,11 @@ export default defineComponent({
                     this.activeRepeaterTab = this.repeaterRows.length - 1;
                     this.activeRepeaterData = this.repeaterRows[this.activeRepeaterTab];
                 }
+            } else if (message.action === 'snippet.message') {
+                this.cs.addScriptLog({
+                    snippet: message.snippet,
+                    message: message.message
+                });
             }
         },
         addRowsToRepeater(rows: any[], isInit: boolean = false) {
@@ -387,7 +402,6 @@ export default defineComponent({
                 this.repeaterRows = [];
             }
             rows.forEach((element: any) => {
-                const t_requestHeaders = JSON.parse(element.request_headers)
                 const t_responseHeaders = JSON.parse(element.response_headers)
                 const t_responseStatus = t_responseHeaders[0].split(" ")[0]
                 let t_httpVersion = "HTTP/1.1";
@@ -451,7 +465,16 @@ export default defineComponent({
                 }
 
                 if(tmpJSONFlag) {
-                    tmpData += "\n\n" + JSON.stringify(JSON.parse(element.response_body), null, 2);
+                    if (element.response_body && element.response_body.trim()) {
+                        try {
+                            tmpData += "\n\n" + JSON.stringify(JSON.parse(element.response_body), null, 2);
+                        } catch (e) {
+                            console.warn("[DEBUG] Failed to parse repeater response_body as JSON:", e);
+                            tmpData += "\n\n" + element.response_body;
+                        }
+                    } else {
+                        tmpData += "\n\n";
+                    }
                 } else {
                     tmpData += "\n\n" + element.response_body
                 }
@@ -459,7 +482,16 @@ export default defineComponent({
                 
                 var tmpResponseContent = tmpData
                 // console.log("Label:", element.title == null ? element.id : element.title, element.id);
-                const t_data = {id: element.id, name: element.host + element.endpoint, requestContent: tmpRequestContent, responseContent: tmpResponseContent, label: element.title == null || element.title.trim() === "" ? element.id : element.title, element: element}
+                const t_data = {
+                    id: element.id, 
+                    name: element.host + element.endpoint, 
+                    requestContent: tmpRequestContent, 
+                    responseContent: tmpResponseContent, 
+                    label: element.title == null || element.title.trim() === "" ? element.id : element.title, 
+                    element: element,
+                    history: null as any,
+                    historyIndex: 0
+                }
                 console.log("Added data:", t_data);
                 this.repeaterRows.push(t_data)
             });
@@ -497,14 +529,13 @@ export default defineComponent({
                 rejectClass: 'p-button-outlined p-button-sm',
                 acceptClass: 'p-button-sm',
                 accept: () => {
-                    this.setRepeaterTabTitle(event)
-                },
-                reject: () => {
+                    this.setRepeaterTabTitle()
+                },                reject: () => {
                     this.$toast.add({ severity: 'error', summary: 'Rejected', detail: 'You have rejected', life: 3000 });
                 }
             });
         },
-        resizedSplitter(event) {
+        resizedSplitter(event: any) {
             console.log("Resizing");
             console.log(event.sizes);
             this.dataTableHeight = `calc(${event.sizes[0]}vh - 80px)`;
@@ -568,19 +599,128 @@ export default defineComponent({
                 t_replayPayload['response_headers'] = ""
                 t_replayPayload['session_id'] = tmpRepeaterData.session_id
                 console.log("Replay payload", t_replayPayload);
+                this.isReplaying = true;
                 this.ws.send(JSON.stringify({'action': 'repeater.replay', 'replay': t_replayPayload, 'platform': this.cs.getSelection.platform, 'user': this.cs.getSelection.user.id, 'deviceId': this.cs.getSelection.device.id}))
             }
         },
         changeRepeater(event: any) {
             console.log("Changed to Repeater");
             // console.log(this.activeRepeaterData);
-            this.activeRepeaterData = this.repeaterRows[event.index]
-            // this.re
-            // this.repeaterRequestViewer.setValue(this.activeRepeaterData.requestContent)
-            // this.repeaterResponseViewer.setValue(this.activeRepeaterData.responseContent)
+            this.activeRepeaterData = this.repeaterRows[event.index];
+            if (this.activeRepeaterData.history === null) {
+                this.activeRepeaterData.history = [];
+                this.ws.send(JSON.stringify({ action: "repeater.history.get", id: this.activeRepeaterData.id }));
+            }
+        },
+        navigateHistory(direction: number) {
+            if (!this.activeRepeaterData) return;
+            
+            const newIndex = this.activeRepeaterData.historyIndex + direction;
+            if (newIndex < 0 || newIndex > this.activeRepeaterData.history.length) return;
+            
+            this.activeRepeaterData.historyIndex = newIndex;
+            
+            let targetData;
+            if (newIndex === this.activeRepeaterData.history.length) {
+                // Return to the current "live" data
+                targetData = this.activeRepeaterData.element;
+            } else {
+                // View historical data
+                targetData = this.activeRepeaterData.history[newIndex];
+            }
+            
+            this.activeRepeaterData.requestContent = this.formatRequest(targetData);
+            this.activeRepeaterData.responseContent = this.formatResponse(targetData);
+        },
+        formatRequest(data: any) {
+            const t_requestHeaders = JSON.parse(data.request_headers);
+            let t_httpVersion = "HTTP/1.1";
+            let tmpJSONFlag = false;
+            
+            t_requestHeaders.forEach((ele: any) => {
+                if (ele.toLowerCase().startsWith("content-type")) {
+                    if (ele.indexOf("application/json") !== -1) {
+                        tmpJSONFlag = true;
+                    }
+                }
+            });
+
+            var tmpData = data.method + " " + data.endpoint + " " + t_httpVersion + "\n";
+            tmpData += t_requestHeaders.join("\n");
+            
+            if (data.request_body && data.request_body.trim()) {
+                if (tmpJSONFlag) {
+                    try {
+                        tmpData += "\n\n" + JSON.stringify(JSON.parse(data.request_body), null, 2);
+                    } catch (e) {
+                        tmpData += "\n\n" + data.request_body;
+                    }
+                } else {
+                    tmpData += "\n\n" + data.request_body;
+                }
+            } else {
+                tmpData += "\n\n ";
+            }
+            return tmpData;
+        },
+        formatResponse(data: any) {
+            if (!data.response_headers) return "";
+            const t_responseHeaders = JSON.parse(data.response_headers);
+            let tmpData = t_responseHeaders.join("\n");
+            let newJSONFlag = false;
+            let isHTTPResponseHeaderPresent = false;
+            let t_httpVersion = "HTTP/1.1";
+
+            t_responseHeaders.forEach((ele: any) => {
+                if (ele.toLowerCase().startsWith("content-type")) {
+                    if (ele.indexOf("application/json") > 0) {
+                        newJSONFlag = true;
+                    }
+                }
+                if (ele.toLowerCase().startsWith("http/") || ele.toLowerCase().startsWith("h2")) {
+                    isHTTPResponseHeaderPresent = true;
+                }
+            });
+
+            if (!isHTTPResponseHeaderPresent) {
+                tmpData = t_httpVersion + " " + data.status_code + " " + (httpStatusCodes[data.status_code] || "") + "\n" + tmpData;
+            }
+
+            if (newJSONFlag && data.response_body && data.response_body.trim()) {
+                try {
+                    tmpData += "\n\n" + JSON.stringify(JSON.parse(data.response_body), null, 2);
+                } catch (e) {
+                    tmpData += "\n\n" + data.response_body;
+                }
+            } else if (data.response_body) {
+                tmpData += "\n\n" + data.response_body;
+            } else {
+                tmpData += "\n\n";
+            }
+            
+            return tmpData;
+        },
+        async copyToClipboard(content: string, type: string) {
+            try {
+                await navigator.clipboard.writeText(content);
+                this.$toast.add({
+                    severity: 'success', 
+                    summary: 'Copied', 
+                    detail: `${type} copied to clipboard`, 
+                    life: 2000
+                });
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                this.$toast.add({
+                    severity: 'error', 
+                    summary: 'Error', 
+                    detail: 'Failed to copy text', 
+                    life: 3000
+                });
+            }
         },
         handleReady(payload: any) {
-            this.view.value = payload.view
+            this.value = payload.view
         },
         sendToRepeater(row: any, duplicate: any = false) {
             if(!duplicate) {
@@ -600,12 +740,12 @@ export default defineComponent({
                 this.showTemplate(event);
             }
         },
-        setRepeaterTabTitle(event: any) {
+        setRepeaterTabTitle() {
             this.ws.send(JSON.stringify({'action': 'repeater.tab.update', 'title': this.repeaterTabTitleConfirmInput, 'id': this.activeRepeaterData.id}))
             var index = this.repeaterRows.findIndex(obj => obj.id === this.activeRepeaterData.id)
             console.log("Updated Tab:", this.repeaterRows[index]);
-            
-            this.repeaterRows[index].label = this.repeaterTabTitleConfirmInput 
+
+            this.repeaterRows[index].label = this.repeaterTabTitleConfirmInput
             console.log("Updated Tab:", this.repeaterRows[index]);
         },
         onRepeaterTabClick(event: any, item: any) {
@@ -615,17 +755,16 @@ export default defineComponent({
             // console.log(this.activeRepeaterData);
             if(this.activeRepeaterData.id === item.id) {
                 this.repeaterRightClickSelectedTab = item;
-                this.$refs.repeaterTabMenu.show(event);
+                (this.$refs.repeaterTabMenu as any).show(event);
             } else {
                 event.preventDefault()
             }
         },
         onRowContextMenu(event: any) {
             console.log(this.$refs.cm);
-            
-            this.$refs.cm.show(event.originalEvent);
-        },
-        toggleTrafficHeader() {
+
+            (this.$refs.cm as any).show(event.originalEvent);
+        },        toggleTrafficHeader() {
             this.visibleTrafficHeader = !this.visibleTrafficHeader
         },
         onRequestSelect(event: any) {
@@ -657,7 +796,7 @@ export default defineComponent({
             
             this.responseContent = tmpData
         },
-        naturalSort(prop, a, b) {
+        naturalSort(prop: any, a: any, b: any) {
             const av = a[prop].toString();
             const bv = b[prop].toString();
             window.console.log(typeof(av), typeof(bv));
