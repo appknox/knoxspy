@@ -1,7 +1,7 @@
-import * as frida from "frida";
-import { Scope } from "frida/dist/device";
+import type { Device, DeviceManager, Scope, Session } from "frida";
 import { AppsDetails, DeviceDetails, SessionInfo, AndroidUsersInfo } from "./types";
 import Adb from "@devicefarmer/adbkit";
+import { getFridaRuntime } from "./frida-loader";
 
 const client = Adb.createClient();
 
@@ -25,9 +25,16 @@ interface OperationOptions {
 /**
  * Convert byte array to image URI for app icons
  */
-function bytesToImageURI(byteBuffer: Buffer): string {
+function bytesToImageURI(byteBuffer: Buffer | Uint8Array): string {
 	const base64String = Buffer.from(byteBuffer).toString('base64');
 	return "data:image/png;base64," + base64String;
+}
+
+function unwrapVariant(value: unknown): unknown {
+	if (Array.isArray(value) && value.length === 2 && typeof value[0] === "symbol") {
+		return value[1];
+	}
+	return value;
 }
 
 /**
@@ -43,18 +50,27 @@ function compareByType(a: AppsDetails, b: AppsDetails): number {
  * Manager class for Frida operations
  */
 export class FridaManager {
-	private deviceManager: frida.DeviceManager;
-	private sessions: Map<string, frida.Session>;
+	private deviceManagerPromise: Promise<DeviceManager>;
+	private sessions: Map<string, Session>;
 	private readonly DEFAULT_TIMEOUT = 10000; // 10 seconds
 	private activeSession: SessionInfo = { session: null, app: null, status: false, channel: null };
 
 	constructor(activeSession: SessionInfo | null = null) {
-		this.deviceManager = frida.getDeviceManager();
+		this.deviceManagerPromise = this.loadDeviceManager();
 		this.sessions = new Map();
 		this.activeSession.session = activeSession?.session || null;
 	}
 
-	async saveActiveSession(session: frida.Session | null): Promise<void> {
+	private async loadDeviceManager(): Promise<DeviceManager> {
+		const frida = await getFridaRuntime();
+		return frida.getDeviceManager();
+	}
+
+	private async getDeviceManager(): Promise<DeviceManager> {
+		return this.deviceManagerPromise;
+	}
+
+	async saveActiveSession(session: Session | null): Promise<void> {
 		this.activeSession.session = session;
 	}
 
@@ -95,7 +111,23 @@ export class FridaManager {
 	async getDeviceUserApplications(device: any, user: any): Promise<AppsDetails[]> {
 		let t_packages: AppsDetails[] = [];
 		try {
-			const t_fetched_packages = await device.getPackages("--user " + user.id + " -3");
+			let t_fetched_packages: string[] = [];
+			const pmArgs = `--user ${user.id} -3`;
+			try {
+				// Work profile package listing requires elevated shell access on many devices.
+				const raw = await device
+					.shell(`su -c 'pm list packages ${pmArgs}'`)
+					.then(Adb.util.readAll)
+					.then((output: Buffer) => output.toString());
+				t_fetched_packages = raw
+					.split("\n")
+					.map((line: string) => line.trim())
+					.filter((line: string) => line.startsWith("package:"))
+					.map((line: string) => line.replace(/^package:/, ""));
+			} catch (suError) {
+				// Fallback for devices where `su` is unavailable.
+				t_fetched_packages = await device.getPackages(pmArgs);
+			}
 			for (const pkg of t_fetched_packages) {
 				t_packages.push({
 					icon: "",
@@ -157,12 +189,13 @@ export class FridaManager {
 	async getDeviceById(
 		deviceId: string,
 		options: OperationOptions = {}
-	): Promise<frida.Device | null> {
+	): Promise<Device | null> {
 		try {
 			const timeout = options.timeout || this.DEFAULT_TIMEOUT;
+			const deviceManager = await this.getDeviceManager();
 
 			// Use Promise.race to implement timeout
-			const devicePromise = this.deviceManager
+			const devicePromise = deviceManager
 				.enumerateDevices()
 				.then((devices) => devices.find((dev) => dev.id === deviceId) || null);
 
@@ -187,7 +220,8 @@ export class FridaManager {
 	async getAllDevices(): Promise<DeviceDetails[]> {
 		const supportedPlatforms = ["Android", "iOS", "iPhone OS"];
 		try {
-			const devices = await this.deviceManager.enumerateDevices();
+			const deviceManager = await this.getDeviceManager();
+			const devices = await deviceManager.enumerateDevices();
 			const deviceDetails: DeviceDetails[] = [];
 
 			// Process each device to get its platform
@@ -215,7 +249,7 @@ export class FridaManager {
 	 * @param device The device
 	 * @returns The platform name
 	 */
-	async getDevicePlatform(device: frida.Device): Promise<string> {
+	async getDevicePlatform(device: Device): Promise<string> {
 		try {
 			const params = await device.querySystemParameters();
 			return params.os?.name || "Unknown";
@@ -237,7 +271,8 @@ export class FridaManager {
 				throw new Error(`Device with ID ${deviceId} not found`);
 			}
 
-			const processes = await device.enumerateProcesses({ scope: Scope.Full });
+			const frida = await getFridaRuntime();
+			const processes = await device.enumerateProcesses({ scope: frida.Scope.Full });
 			// console.log("[findProcesses] Processes:", processes);
 
 			if (appName.trim() !== "") {
@@ -258,11 +293,15 @@ export class FridaManager {
 	 * @param targetUid The user ID to filter by
 	 * @returns List of process PIDs
 	 */
-	async findProcessPidsByUid(deviceId: string, appName: string, targetUid: number): Promise<string[]> {
+	async findProcessPidsByUid(
+		deviceId: string,
+		appName: string,
+		targetUid: number
+	): Promise<Array<{ pid: string; name: string }>> {
 		const device = client.getDevice(deviceId);
 
-		// Filter ps output for processes whose USER column starts with u{targetUid}_
-		const shellCmd = `ps -A | grep ${appName} | grep -E "^u${targetUid}_"`;
+		// Pull all processes for the target Android user, then filter in JS.
+		const shellCmd = `ps -A | grep -E "^u${targetUid}_"`;
 
 		return device.shell(shellCmd)
 			.then(Adb.util.readAll)
@@ -273,13 +312,19 @@ export class FridaManager {
 					return [];
 				}
 
-				// Extract PID from column 2 (index 1) of each line
-				const pids = lines.map(line => {
+				// Typical Android ps format:
+				// USER PID PPID VSZ RSS WCHAN ADDR S NAME
+				const processes = lines
+				.map(line => {
 					const parts = line.trim().split(/\s+/);
-					return { pid: parts[1] }; // PID column
-				});
+					const pid = parts[1];
+					const name = parts[parts.length - 1];
+					return { pid, name };
+				})
+				.filter((proc) => !!proc.pid && !!proc.name)
+				.filter((proc) => proc.name === appName || proc.name.startsWith(appName + ":"));
 
-				return pids;
+				return processes;
 			});
 	}
 
@@ -300,13 +345,18 @@ export class FridaManager {
 			}
 
 			const applications = await device.enumerateApplications({
-				scope: Scope.Full,
+				scope: (await getFridaRuntime()).Scope.Full,
 			});
 
 			for (const app of applications) {
-				const params = app.parameters;
-				if (params.icons?.length) {
-					const imageData = bytesToImageURI(params.icons[0].image);
+				const icons = unwrapVariant((app.parameters as Record<string, unknown>).icons);
+				if (Array.isArray(icons) && icons.length > 0) {
+					const firstIcon = unwrapVariant(icons[0]);
+					const image = (firstIcon as { image?: Buffer | Uint8Array } | null)?.image;
+					if (!image) {
+						continue;
+					}
+					const imageData = bytesToImageURI(image);
 					const appsDetails: AppsDetails = {
 						icon: imageData,
 						id: app.identifier,
@@ -337,13 +387,13 @@ export class FridaManager {
 		deviceId: string,
 		appId: string,
 		user: string
-	): Promise<OutputResult<frida.Session>> {
+	): Promise<OutputResult<Session>> {
 		if (this.activeSession) {
 			console.log("Active session already exists. Will try to attach to app instead!");
 		}
 			
-		const tmpOutput: OutputResult<frida.Session> = {
-			output: null as unknown as frida.Session,
+		const tmpOutput: OutputResult<Session> = {
+			output: null as unknown as Session,
 			status: false,
 		};
 
@@ -366,7 +416,7 @@ export class FridaManager {
 			tmpOutput.status = true;
 		} catch (e: any) {
 			console.error(`Error launching app ${appId} on device ${deviceId}:`, e);
-			tmpOutput.output = null as unknown as frida.Session;
+			tmpOutput.output = null as unknown as Session;
 			tmpOutput.error = `Error launching app: ${e.message}`;
 			tmpOutput.status = false;
 		}
@@ -380,8 +430,9 @@ export class FridaManager {
 	 * @param processID The process ID
 	 * @returns Frida session
 	 */
-	async attachToApp(deviceId: string, processID: string): Promise<frida.Session> {
+	async attachToApp(deviceId: string, processID: string): Promise<Session> {
 		try {
+			const frida = await getFridaRuntime();
 			const device = await frida.getDevice(deviceId);
 
 			if (!device) {
@@ -408,7 +459,7 @@ export class FridaManager {
 	 * Detach from a session
 	 * @param session The session to detach from
 	 */
-	async detachSession(session: frida.Session): Promise<boolean> {
+	async detachSession(session: Session): Promise<boolean> {
 		try {
 			await session.detach();
 

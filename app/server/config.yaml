@@ -3,6 +3,10 @@ library:
     file: android_okhttp.js
     platform: Android
   
+  - name: OkHttp_Obfuscated
+    file: android_okhttp_obfuscated.js
+    platform: Android
+  
   - name: Alamofire
     file: ios_alamofire.js
     platform: iOS

@@ -56,6 +56,19 @@ interface LibraryData {
 }
 
 /**
+ * Snippet data structure
+ */
+interface SnippetData {
+  id?: number;
+  name: string;
+  content: string;
+  platform: string;
+  source_type: string;
+  source_url?: string;
+  created_at?: string;
+}
+
+/**
  * Active session data structure
  */
 interface ActiveSessionData {
@@ -175,6 +188,9 @@ export default class DBManager {
    * Initialize database tables
    */
   private async initializeDatabase(): Promise<void> {
+    // Enable foreign keys
+    await this.execute("PRAGMA foreign_keys = ON");
+
     const tables = [
       `CREATE TABLE IF NOT EXISTS sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,11 +231,35 @@ export default class DBManager {
         title TEXT,
         FOREIGN KEY (session_id) REFERENCES sessions(id)
       )`,
+      `CREATE TABLE IF NOT EXISTS repeater_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        repeater_id INTEGER,
+        method TEXT,
+        host TEXT,
+        endpoint TEXT,
+        protocol TEXT,
+        status_code INTEGER,
+        request_headers TEXT,
+        response_headers TEXT,
+        response_body TEXT,
+        request_body TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (repeater_id) REFERENCES repeater_traffic(id) ON DELETE CASCADE
+      )`,
       `CREATE TABLE IF NOT EXISTS library (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         file TEXT,
         platform TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS snippets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        content TEXT,
+        platform TEXT,
+        source_type TEXT,
+        source_url TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )`,
     ];
 
@@ -876,6 +916,52 @@ export default class DBManager {
   }
 
   /**
+   * Save a snapshot to repeater history
+   * @param repeaterId The ID of the repeater tab
+   * @param data The traffic data to save
+   * @returns Promise resolving with the inserted ID
+   */
+  async saveRepeaterHistory(repeaterId: number, data: any): Promise<number> {
+    const historyData = { ...data, repeater_id: repeaterId };
+    delete historyData.id;
+    delete historyData.session_id;
+    delete historyData.title;
+
+    // Ensure headers are stored as strings
+    if (Array.isArray(historyData.request_headers)) {
+      historyData.request_headers = JSON.stringify(historyData.request_headers);
+    }
+
+    if (Array.isArray(historyData.response_headers)) {
+      historyData.response_headers = JSON.stringify(historyData.response_headers);
+    }
+
+    const columns = Object.keys(historyData);
+    const values = Object.values(historyData);
+    const placeholders = columns.map(() => "?").join(",");
+
+    const sql = `INSERT INTO repeater_history (${columns.join(
+      ", "
+    )}) VALUES (${placeholders})`;
+
+    const response = await this.execute<{ id: number }>(sql, values);
+    return response.success ? response.data?.id || -1 : -1;
+  }
+
+  /**
+   * Get all history entries for a specific repeater tab
+   * @param repeaterId Repeater tab ID
+   * @returns Promise resolving with history entries
+   */
+  async getRepeaterHistory(repeaterId: number): Promise<RepeaterTrafficData[]> {
+    const response = await this.queryAll<RepeaterTrafficData>(
+      `SELECT * FROM repeater_history WHERE repeater_id = ? ORDER BY id ASC`,
+      [repeaterId]
+    );
+    return response.success ? response.data || [] : [];
+  }
+
+  /**
    * Delete a repeater tab
    * @param rowId Repeater record ID
    * @returns Promise resolving with operation success
@@ -1027,6 +1113,79 @@ export default class DBManager {
         console.error("Error in deleteLibrary:", err);
         callback(false);
       });
+  }
+
+  /**
+   * Get all snippets
+   * @returns Promise resolving with all snippets
+   */
+  async getSnippets(): Promise<SnippetData[]> {
+    const response = await this.queryAll<SnippetData>(
+      "SELECT * FROM snippets ORDER BY created_at DESC"
+    );
+    return response.success ? response.data || [] : [];
+  }
+
+  /**
+   * Add a new snippet
+   * @param data Snippet data
+   * @returns Promise resolving with the inserted ID
+   */
+  async addSnippet(data: Partial<SnippetData>): Promise<number> {
+    const columns = Object.keys(data);
+    const values = Object.values(data);
+    const placeholders = columns.map(() => "?").join(",");
+
+    const sql = `INSERT INTO snippets (${columns.join(
+      ", "
+    )}) VALUES (${placeholders})`;
+
+    const response = await this.execute<{ id: number }>(sql, values);
+    return response.success ? response.data?.id || -1 : -1;
+  }
+
+  /**
+   * Update a snippet
+   * @param id Snippet ID
+   * @param data Updated snippet data
+   * @returns Promise resolving with operation success
+   */
+  async updateSnippet(id: number, data: Partial<SnippetData>): Promise<boolean> {
+    const columns = Object.keys(data);
+    const values = [...Object.values(data), id];
+
+    const setClause = columns.map((col) => `${col} = ?`).join(", ");
+    const sql = `UPDATE snippets SET ${setClause} WHERE id = ?`;
+
+    const response = await this.execute(sql, values);
+    return response.success;
+  }
+
+  /**
+   * Delete a snippet
+   * @param id Snippet ID
+   * @returns Promise resolving with operation success
+   */
+  async deleteSnippet(id: number): Promise<boolean> {
+    const sql = `DELETE FROM snippets WHERE id = ?`;
+    const response = await this.execute(sql, [id]);
+
+    return response.success;
+  }
+
+  /**
+   * Get snippets by ID
+   * @param ids Array of snippet IDs
+   * @returns Promise resolving with snippets
+   */
+  async getSnippetsByIds(ids: number[]): Promise<SnippetData[]> {
+    if (ids.length === 0) return [];
+    
+    const placeholders = ids.map(() => "?").join(",");
+    const sql = `SELECT * FROM snippets WHERE id IN (${placeholders})`;
+    
+    const response = await this.queryAll<SnippetData>(sql, ids);
+    return response.success ? response.data || [] : [];
   }
 
   /**

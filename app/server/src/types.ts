@@ -1,5 +1,5 @@
 
-import { Session } from "frida";
+import type { Session } from "frida";
 
 export type AppsDetails = {
   icon: string;

@@ -1,5 +1,4 @@
-import { Session, Script } from "frida";
-import { MessageType } from "frida/dist/script";
+import type { Session, Message, ErrorMessage, SendMessage } from "frida";
 import { readFileSync, existsSync } from "fs";
 import path from "path";
 import DBManager from "./database";
@@ -22,6 +21,14 @@ class REPLManager {
 		console.log("REPL Constructor called!");
 	}
 
+	private isErrorMessage(message: Message): message is ErrorMessage {
+		return message.type === "error";
+	}
+
+	private isSendMessage(message: Message): message is SendMessage {
+		return message.type === "send";
+	}
+
 	async detect_platform(): Promise<void> {
 		console.log("Got request for checking device platform");
 		const parentDir = path.join(__dirname, "..");
@@ -35,11 +42,11 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent);
+			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -49,7 +56,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload } = message;
 					this.ws.broadcastData(
 						JSON.stringify({ action: "detectPlatform", message: payload })
@@ -82,11 +89,11 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent);
+			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -96,7 +103,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload } = message;
 					try {
 						const tmpJson = JSON.parse(payload);
@@ -143,11 +150,11 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent);
+			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -157,7 +164,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload: messagePayload } = message;
 					try {
 						const tmpJson = JSON.parse(messagePayload);
@@ -171,6 +178,10 @@ class REPLManager {
 							})
 						);
 						
+						this.dbManager.saveRepeaterHistory(ID, tmpJson).then((historyId: number) => {
+							console.log("Saved replayed request to history:", historyId);
+						});
+
 						this.dbManager.updateReplayedRepeater(tmpJson, (updated: any) => {
 							console.log("updated replayed request");
 						});
@@ -206,6 +217,57 @@ class REPLManager {
 		}
 	}
 
+	async run_snippet(name: string, content: string): Promise<void> {
+		console.log(`Executing snippet: ${name}`);
+		
+		try {
+			const script = await this.session!.createScript(content, { runtime: "qjs" as any });
+			
+			script.message.connect((message: Message, data) => {
+				console.log(`Snippet (${name}) Message: ` + message.type);
+				if (this.isErrorMessage(message)) {
+					const { columnNumber, description, fileName, lineNumber, stack } = message;
+					console.log(columnNumber, description, fileName, lineNumber, stack);
+					this.sendScriptError({
+						description,
+						fileName,
+						stack,
+						line: lineNumber,
+						column: columnNumber,
+					});
+				} else if (this.isSendMessage(message)) {
+					const { payload } = message;
+					// For snippets, we can just broadcast as a general script message for now
+					this.ws.broadcastData(
+						JSON.stringify({ 
+							action: "snippet.message", 
+							snippet: name,
+							message: payload 
+						})
+					);
+				}
+			});
+			
+			script.destroyed.connect(() => {
+				console.log(`Snippet (${name}) destroyed`);
+			});
+			
+			await script.load();
+
+			// Broadcast successful attachment
+			this.ws.broadcastData(
+				JSON.stringify({ 
+					action: "snippet.message", 
+					snippet: "System",
+					message: `Snippet attached successfully: ${name}` 
+				})
+			);
+		} catch (error) {
+			console.error(`Error executing snippet ${name}:`, error);
+			this.sendScriptError(`Failed to load snippet ${name}: ${error instanceof Error ? error.message : String(error)}`);
+		}
+	}
+
 	async run_script(code: string): Promise<void> {
 		console.log("Got request for executing code");
 		const parentDir = path.join(__dirname, "..");
@@ -222,11 +284,11 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent);
+			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
 			
-			script.message.connect((message, data) => {
+			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
-				if (message.type === MessageType.Error) {
+				if (this.isErrorMessage(message)) {
 					const { columnNumber, description, fileName, lineNumber, stack } = message;
 					console.log(columnNumber, description, fileName, lineNumber, stack);
 					this.sendScriptError({
@@ -236,7 +298,7 @@ class REPLManager {
 						line: lineNumber,
 						column: columnNumber,
 					});
-				} else {
+				} else if (this.isSendMessage(message)) {
 					const { payload: messagePayload } = message;
 					try {
 						const tmpJson = JSON.parse(messagePayload);
@@ -269,15 +331,24 @@ class REPLManager {
 			script.destroyed.connect(() => {
 				console.log("Script destroyed");
 			});
-			
 			await script.load();
-			
+
 			this.ws.broadcastData(
 				JSON.stringify({
 					action: "general.ack",
 					message: `${code} library attached!`,
 				})
 			);
+
+			// Also log to the snippet console
+			this.ws.broadcastData(
+				JSON.stringify({ 
+					action: "snippet.message", 
+					snippet: "System",
+					message: `Library attached successfully: ${code}` 
+				})
+			);
+			} catch (error) {
 			this.ws.broadcastData(
 				JSON.stringify({
 					action: "library.change.ack",

@@ -54,9 +54,9 @@
                 </div>
                 <ul class="app-list" v-if="cs.getSelection.apps && cs.getSelection.apps.length > 0" style="padding-bottom: 100px;">
                     <ContextMenu ref="menu" :model="appMenu" />
-                    <li v-for="item in sortedApps" :key="item.id" @click="startApp(item.id)" @contextmenu="onRightClick($event, item)">
-                        <img :src="item.icon || defaultPng">
-                        <p>{{ item.name }}</p>
+                    <li v-for="appObject in sortedApps" :key="appObject.id" @click="startApp(appObject.id)" @contextmenu="onRightClick($event, appObject)">
+                        <img :src="appObject.icon || defaultPng">
+                        <p>{{ appObject.name }}</p>
                     </li>
                 </ul>
             </div>
@@ -188,10 +188,20 @@ export default defineComponent({
                 action: type
             }})
         },
-        onRightClick(event: any, item: any) {
-            this.rightClickMenuIdentifier = item.id
-            this.rightClickMenuApp = item.name
-            this.$refs.menu.show(event);
+        onRightClick(event: any, appObject: any) {
+            console.log("DEBUG: AppManager.onRightClick", { 
+                type: typeof appObject, 
+                hasId: !!appObject?.id, 
+                hasName: !!appObject?.name,
+                nameType: typeof appObject?.name 
+            });
+            try {
+                this.rightClickMenuIdentifier = appObject.id;
+                this.rightClickMenuApp = appObject.name;
+                (this.$refs.menu as any).show(event);
+            } catch (err) {
+                console.error("CRITICAL: Error in onRightClick", err);
+            }
         },
         switchDevice() {
             const t_device = this.cs.getSelection.device;
