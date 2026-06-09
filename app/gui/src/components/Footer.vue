@@ -172,7 +172,7 @@
 <script>
 import { defineComponent, watch } from "vue";
 import { useAppStore, useWebSocketStore } from "../stores/session";
-import InlineMessage from "primevue/inlineMessage";
+import InlineMessage from "primevue/inlinemessage";
 
 /** ToDo
 - On clicking App Connection, check if data is loaded or not for app to launch

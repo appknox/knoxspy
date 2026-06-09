@@ -32,7 +32,7 @@
 <script lang="ts">
 import { defineComponent, watch } from "vue";
 import Button from "primevue/button";
-import InlineMessage from 'primevue/inlineMessage';
+import InlineMessage from 'primevue/inlinemessage';
 import { useAppStore, useWebSocketStore } from "../stores/session";
 import OverlayPanel from 'primevue/overlaypanel';
 import Toast from 'primevue/toast';

@@ -356,10 +356,7 @@ class REPLManager {
 					message: `${code} library attached!`,
 				})
 			);
-		} catch (error) {
-			console.error("Error running script:", error);
-			this.sendScriptError(`Failed to run script ${code}: ${error instanceof Error ? error.message : String(error)}`);
-		}
+		} 
 	}
 	
 	// Helper methods to standardize message sending

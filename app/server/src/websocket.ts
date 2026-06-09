@@ -715,7 +715,7 @@ class WebSocketClient {
 		await fridaManager.saveActiveSession(null);
 		console.log("[handleAppDisconnect] Active session cleared");
 		
-		this.broadcastData({
+		this.manager.broadcastData({
 			action: "snippet.message",
 			snippet: "System",
 			message: "App disconnected, session cleared."
