@@ -12,6 +12,7 @@ interface OutputResult<T> {
 	output: T;
 	status: boolean;
 	error?: string;
+	pid?: number;
 }
 
 /**
@@ -404,8 +405,10 @@ export class FridaManager {
 				throw new Error(`Device with ID ${deviceId} not found`);
 			}
 
-			const pid = await device.spawn(appId, { uid: parseInt(user)} );
-			device.resume(pid);
+				const pid = await device.spawn(appId, { uid: parseInt(user)} );
+			// NOTE: Do NOT resume here. The process stays suspended so the caller
+			// can attach a Frida session and inject scripts before the Java VM runs.
+			// The caller must call resumeApp(deviceId, pid) after all scripts are loaded.
 			const session = await device.attach(pid);
 
 			// Store session for later cleanup
@@ -413,6 +416,7 @@ export class FridaManager {
 			this.sessions.set(sessionKey, session);
 
 			tmpOutput.output = session;
+			tmpOutput.pid = pid;
 			tmpOutput.status = true;
 		} catch (e: any) {
 			console.error(`Error launching app ${appId} on device ${deviceId}:`, e);
@@ -422,6 +426,26 @@ export class FridaManager {
 		}
 
 		return tmpOutput;
+	}
+
+	/**
+	 * Resume a previously spawned (suspended) process.
+	 * Must be called after all Frida scripts have been loaded.
+	 * @param deviceId The device ID
+	 * @param pid The process ID returned by launchApp
+	 */
+	async resumeApp(deviceId: string, pid: number): Promise<void> {
+		try {
+			const device = await this.getDeviceById(deviceId);
+			if (!device) {
+				throw new Error(`Device with ID ${deviceId} not found`);
+			}
+			await device.resume(pid);
+			console.log(`[FridaManager] Resumed pid ${pid} on device ${deviceId}`);
+		} catch (error) {
+			console.error(`Error resuming pid ${pid} on device ${deviceId}:`, error);
+			throw error;
+		}
 	}
 
 	/**

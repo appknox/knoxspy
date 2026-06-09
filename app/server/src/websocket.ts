@@ -443,6 +443,7 @@ class WebSocketClient {
 		}
 
 		const session = result.output;
+		const spawnedPid = result.pid!;
 		const t_app: App = {
 			id: data.appId,
 			name: data.appName,
@@ -487,17 +488,24 @@ class WebSocketClient {
 				await repl.run_snippet(snippet.name, snippet.content);
 			}
 		}
+
+		// Resume the process ONLY after all scripts are loaded.
+		// This guarantees the Java bridge is in place before any app code runs.
+		console.log("[handleAppSpawn] All scripts loaded. Resuming pid:", spawnedPid);
+		await fridaManager.resumeApp(data.deviceId, spawnedPid);
 	}
+
 
 	private async handleAppAttach(data: any): Promise<void> {
 		const platform = data.platform;
 		const user = data.user;
 		const appName = data.appName;
+		const appId = data.appId;
 		const deviceId = data.deviceId;
 		let t_process = [];
 
 		if(platform.toLowerCase() === "android") {
-			t_process = await fridaManager.findProcessPidsByUid(deviceId, appName, parseInt(user));
+			t_process = await fridaManager.findProcessPidsByUid(deviceId, appId, parseInt(user));
 		} else {
 			t_process = await fridaManager.findProcesses(deviceId, appName);
 		}
@@ -511,9 +519,9 @@ class WebSocketClient {
 		let selectedProcess: any = t_process[0];
 		if (platform.toLowerCase() === "android") {
 			const scoreProcess = (name: string): number => {
-				if (name === appName) return 0;
-				if (name.startsWith(appName + ":")) return 1;
-				if (name.includes(appName)) return 2;
+				if (name === appId) return 0;
+				if (name.startsWith(appId + ":")) return 1;
+				if (name.includes(appId)) return 2;
 				return 3;
 			};
 			const sorted = [...t_process].sort((a: any, b: any) => {

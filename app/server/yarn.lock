@@ -1154,6 +1154,11 @@ fresh@~0.5.2, fresh@0.5.2:
   resolved "https://registry.npmjs.org/fresh/-/fresh-0.5.2.tgz"
   integrity sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==
 
+frida-java-bridge@^7.0.13:
+  version "7.0.13"
+  resolved "https://registry.npmjs.org/frida-java-bridge/-/frida-java-bridge-7.0.13.tgz"
+  integrity sha512-YSyKjxbxKnSi3KSUy9vciOvTOuq0RRh9dkxzkQVEdfIIZlw20zE8D3Cq9eL2FDqUVj4YKas6Wf09kCjL5zbffg==
+
 frida@^17.3.2:
   version "17.3.2"
   resolved "https://registry.npmjs.org/frida/-/frida-17.3.2.tgz"

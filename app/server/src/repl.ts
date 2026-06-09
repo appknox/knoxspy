@@ -42,7 +42,7 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
+			const script = await this.session!.createScript(fileContent, { runtime: "v8" as any });
 			
 			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
@@ -89,7 +89,7 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
+			const script = await this.session!.createScript(fileContent, { runtime: "v8" as any });
 			
 			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
@@ -150,7 +150,7 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
+			const script = await this.session!.createScript(fileContent, { runtime: "v8" as any });
 			
 			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
@@ -221,7 +221,7 @@ class REPLManager {
 		console.log(`Executing snippet: ${name}`);
 		
 		try {
-			const script = await this.session!.createScript(content, { runtime: "qjs" as any });
+			const script = await this.session!.createScript(content, { runtime: "v8" as any });
 			
 			script.message.connect((message: Message, data) => {
 				console.log(`Snippet (${name}) Message: ` + message.type);
@@ -284,7 +284,13 @@ class REPLManager {
 		const fileContent = readFileSync(filePath, "utf8");
 		
 		try {
-			const script = await this.session!.createScript(fileContent, { runtime: "qjs" as any });
+			// frida-compile bundles start with 📦 and carry their own runtime metadata.
+			// Passing a runtime option to a bundle causes it to be ignored anyway, but
+			// plain scripts need "v8" so the Java global (frida-java-bridge) is available.
+			const isFridaBundle = fileContent.startsWith("\uD83D\uDCE6");
+			console.log(`[REPL] (run_script) Loading ${isFridaBundle ? "frida-compile bundle" : "plain script"}: ${code}`);
+			const scriptOptions = isFridaBundle ? {} : { runtime: "v8" as any };
+			const script = await this.session!.createScript(fileContent, scriptOptions);
 			
 			script.message.connect((message: Message, data) => {
 				console.log("Script Message: " + message.type);
