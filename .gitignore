@@ -27,3 +27,5 @@ src/uploads/*
 src/components/*js
 
 data.db
+knoxspy_analysis/
+*.apk

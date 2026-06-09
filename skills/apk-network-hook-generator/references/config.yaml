@@ -1,0 +1,20 @@
+library:
+  - name: OkHttp
+    file: android_okhttp.js
+    platform: Android
+  
+  - name: OkHttp_Obfuscated
+    file: android_okhttp_obfuscated.js
+    platform: Android
+  
+  - name: Alamofire
+    file: ios_alamofire.js
+    platform: iOS
+  
+  - name: Flutter_HTTP
+    file: flutter_combined.js
+    platform: Android
+  
+  - name: Flutter_DIO
+    file: flutter_dio_combined.js
+    platform: Android
