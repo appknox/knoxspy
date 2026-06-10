@@ -57,11 +57,11 @@ Check that these tools are in `$PATH`:
 - `jadx` — if not found, also check `/home/yash/.apklab/jadx-1.5.3/bin/jadx`
 - `apktool`
 
-If either is missing, stop and tell the user what to install. Do NOT check for `analyzeHeadless` yet — that is only needed if Flutter is detected later.
+If either is missing, stop and tell the user what to install. Do NOT check for `analyzeHeadless` yet — that is only needed if Flutter is detected later. 
 
 ### Step 2 — Decompile the APK
 
-Create a working directory and decompile with both tools:
+Create a working directory and decompile with both tools, and also note that apktool sometimes tends to take longer to decompile, so run the apktool decompilation in background and check on it for 5 minutes, continue with rest of the skill if the apktool doesn't finish by then:
 
 ```bash
 WORK_DIR="knoxspy_analysis/$(basename $APK_PATH .apk)"
@@ -363,7 +363,7 @@ Then copy `<package_name>_hook.js` to `knoxspy/app/server/libraries/` and restar
 > output JS so `Java` is available without any server-side changes.
 ```
 
-### Step 8 — Save Outputs
+### Step 8 — Save Outputs and Update Server
 
 For **Java-layer hooks** (OkHttp, Volley, etc.), perform these steps:
 
@@ -390,18 +390,28 @@ Save to `output_dir` (default `knoxspy_analysis/output/`):
 - `<package_name>_hook.js` — Compiled bundle that KnoxSpy loads
 - `<package_name>_analysis.md`
 
+**Server Integration (Mandatory)**:
+1. Copy the generated `<package_name>_hook.js` to `app/server/libraries/<package_name>_hook.js`.
+2. Update `app/server/config.yaml` to include the new hook by appending it to the `library:` list. Set the `platform` to `Android` or `iOS` depending on the target application:
+   ```yaml
+     - name: <package_name>
+       file: <package_name>_hook.js
+       platform: <Android or iOS>
+   ```
+
 Print:
 ```
 ✅ Analysis complete for <package_name>
    Framework:       <framework_type>
    Network Library: <network_lib>
    Source File:     knoxspy_analysis/output/<package_name>_hook.entry.ts
-   Hook Script:     knoxspy_analysis/output/<package_name>_hook.js
+   Hook Script:     app/server/libraries/<package_name>_hook.js
    Report:          knoxspy_analysis/output/<package_name>_analysis.md
 
    To recompile after editing the hook:
      cd knoxspy_analysis/output
      npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
+     cp <package_name>_hook.js ../../app/server/libraries/
 ```
 
 ## References
