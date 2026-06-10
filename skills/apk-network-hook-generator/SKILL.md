@@ -258,41 +258,74 @@ If a native library with HTTP symbols is found, use Ghidra to decompile relevant
 
 ### Step 6 — Generate the Frida Hook Script
 
-Use the reference scripts in `references/` as templates. Adapt based on `network_lib`:
+#### Why frida-compile is required (Frida 17+)
+
+Frida 17+ **removed the `Java` global** from scripts loaded via `session.createScript()` (the Node.js API that KnoxSpy uses internally). In older Frida, `Java` was auto-available everywhere. Now it only exists in:
+- The Frida CLI tools (`frida`, `frida-trace`) — they bundle it themselves
+- Scripts compiled with `frida-compile` — the bridge is baked into the output JS
+
+**There is no way to access `Java` in a plain `.js` file loaded by KnoxSpy on Frida 17+.** The solution is always `frida-compile`.
+
+#### Hook file format
+
+The output hook must be written as a **TypeScript entry file** (`<package_name>_hook.entry.ts`) that:
+1. `import`s `frida-java-bridge` to make `Java` available
+2. Contains all hook logic inline (no separate file needed)
+
+Then compiled with `frida-compile` to produce `<package_name>_hook.js` — the file KnoxSpy actually loads.
+
+**Template structure for all Java-layer hooks:**
+```typescript
+/**
+ * KnoxSpy Auto-Generated Hook
+ * Package: <package_name>
+ * Framework: <framework_type>
+ * Network Library: <network_lib>
+ * Generated: <ISO timestamp>
+ *
+ * SOURCE FILE — edit this, then recompile:
+ *   cd knoxspy_analysis/output
+ *   npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
+ */
+
+import Java from "frida-java-bridge";
+(globalThis as any).Java = Java;
+
+Java.perform(() => {
+    // ... generated hook code ...
+});
+```
+
+**For Flutter/native hooks** (no Java layer), use a plain `.js` file — `Interceptor.attach()` does not need the Java bridge:
+```javascript
+// KnoxSpy Auto-Generated Hook — Flutter/Native
+// Package: <package_name>
+// No frida-compile needed for native-only hooks.
+
+Interceptor.attach(...);
+```
+
+#### Reference templates by library
 
 | `network_lib` | Reference template | Key hook point |
 |---|---|---|
 | `okhttp3` | `references/android_okhttp.js` | `OkHttpClient.newCall(okhttp3.Request)` |
 | `okhttp3_obfuscated` | `references/android_okhttp_obfuscated.js` | Reflection-based, hook obfuscated class names found in Step 5A |
 | `retrofit2_over_okhttp` | Same as okhttp3/okhttp3_obfuscated | Hook the underlying OkHttp layer |
-| `flutter_native` | `references/flutter_combined.js` | Replace offsets with values from Step 5B |
+| `flutter_native` | `references/flutter_combined.js` | Replace offsets with values from Step 5B — **plain JS, no frida-compile** |
 | `volley` | Generate new | Hook `BasicNetwork.performRequest` |
 | `httpurlconnection` | Generate new | Hook `URL.openConnection`, `HttpURLConnection.getInputStream` |
 | `apache_http` | Generate new | Hook `HttpClient.execute` |
 | `custom` | Generate new | Hook the choke point identified in Step 5C |
 
-**For unknown/custom hooks**, the generated script must:
-- Wrap everything in `Java.perform(function() { ... })` (Java) or use `Interceptor.attach()` (native)
+**For all Java-layer hooks**, the generated script must:
+- Use `Java.perform(() => { ... })` (arrow function, not `function()`) at top level — no IIFE wrapper
 - Try/catch around all extraction logic
-- Log debug info: `console.log("[KnoxSpy-Custom]", ...)`
-- Handle async callbacks by storing request data keyed by thread/connection ID and flushing when response arrives
+- Log debug info: `console.log("[KnoxSpy]", ...)`
+- Handle async callbacks by storing request data keyed by thread/connection ID
 - Always format and `send()` in the payload format from the top of this file
 
-**Flutter offset warning**: The offsets in `references/flutter_combined.js` (e.g., `libFlutter.base.add(8879008)`) are build-specific. ALWAYS replace with offsets discovered from the target APK's `libflutter.so`.
-
-Wrap the generated code:
-```javascript
-// KnoxSpy Auto-Generated Hook
-// Package: <package_name>
-// Framework: <framework_type>
-// Network Library: <network_lib>
-// Generated: <ISO timestamp>
-// Usage: frida -U -f <package_name> -l <this_file>
-
-(function() {
-    // ... generated hook code ...
-})();
-```
+**Flutter offset warning**: The offsets in `references/flutter_combined.js` are build-specific. ALWAYS replace with offsets discovered from the target APK's `libflutter.so`.
 
 ### Step 7 — Generate Markdown Report
 
@@ -302,22 +335,73 @@ Write `<package_name>_analysis.md` containing:
 2. **Framework Detection** — table of all frameworks checked with ✅/❌ and evidence
 3. **Network Library Analysis** — which library was found, obfuscation status, class/function names
 4. **Hooking Strategy** — table of every function/method being hooked, what it captures, addresses/offsets for native hooks
-5. **Generated Files** — paths to the hook script and this report
+5. **Generated Files** — paths to both the source `.entry.ts` and the compiled `.js`, with recompile instructions
 6. **Caveats** — any warnings (offset specificity, obfuscation fragility, manual steps needed)
+
+The **Generated Files** section must always include this block:
+
+```markdown
+## Generated Files
+
+| File | Purpose |
+|------|--------|
+| `<package_name>_hook.entry.ts` | **Source file** — edit this to modify the hook |
+| `<package_name>_hook.js` | **Compiled bundle** — KnoxSpy loads this file |
+| `<package_name>_analysis.md` | This report |
+
+### How to recompile after editing the source
+
+```bash
+cd knoxspy_analysis/output
+npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
+```
+
+Then copy `<package_name>_hook.js` to `knoxspy/app/server/libraries/` and restart the server.
+
+> **Why `frida-compile`?** Frida 17+ removed the `Java` global from scripts loaded
+> via the Node.js API. `frida-compile` bundles `frida-java-bridge` directly into the
+> output JS so `Java` is available without any server-side changes.
+```
 
 ### Step 8 — Save Outputs
 
+For **Java-layer hooks** (OkHttp, Volley, etc.), perform these steps:
+
+```bash
+OUTPUT_DIR="knoxspy_analysis/output"
+PKG="<package_name>"
+
+# 1. Write the TypeScript source (the file you edit)
+# → $OUTPUT_DIR/${PKG}_hook.entry.ts
+
+# 2. Compile it into the bundle KnoxSpy loads
+cd "$OUTPUT_DIR"
+npx frida-compile "${PKG}_hook.entry.ts" -o "${PKG}_hook.js"
+cd -
+
+# 3. Write the markdown report
+# → $OUTPUT_DIR/${PKG}_analysis.md
+```
+
+For **Flutter/native hooks** (no Java bridge needed), skip step 2 — write `${PKG}_hook.js` directly as a plain JS file.
+
 Save to `output_dir` (default `knoxspy_analysis/output/`):
-- `<package_name>_hook.js`
+- `<package_name>_hook.entry.ts` — TypeScript source (Java-layer hooks only)
+- `<package_name>_hook.js` — Compiled bundle that KnoxSpy loads
 - `<package_name>_analysis.md`
 
 Print:
 ```
 ✅ Analysis complete for <package_name>
-   Framework: <framework_type>
+   Framework:       <framework_type>
    Network Library: <network_lib>
-   Hook Script: <path>
-   Report: <path>
+   Source File:     knoxspy_analysis/output/<package_name>_hook.entry.ts
+   Hook Script:     knoxspy_analysis/output/<package_name>_hook.js
+   Report:          knoxspy_analysis/output/<package_name>_analysis.md
+
+   To recompile after editing the hook:
+     cd knoxspy_analysis/output
+     npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
 ```
 
 ## References
