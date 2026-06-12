@@ -9,7 +9,7 @@ description: >
   its HTTP traffic without a proxy.
 metadata:
   version: "1.0.0"
-  author: knoxspy
+  author: appknox
   tags:
     - android
     - frida
