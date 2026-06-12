@@ -54,7 +54,7 @@ send(JSON.stringify(tmpPayload));
 ### Step 1 — Validate Dependencies
 
 Check that these tools are in `$PATH`:
-- `jadx` — if not found, also check `/home/yash/.apklab/jadx-1.5.3/bin/jadx`
+- `jadx` — if not found, also check `$HOME/.apklab/jadx-1.5.3/bin/jadx`
 - `apktool`
 
 If either is missing, stop and tell the user what to install. Do NOT check for `analyzeHeadless` yet — that is only needed if Flutter is detected later. 
@@ -356,7 +356,7 @@ cd knoxspy_analysis/output
 npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
 ```
 
-Then copy `<package_name>_hook.js` to `knoxspy/app/server/libraries/` and restart the server.
+Then, if the `app/server/libraries/` directory exists, copy `<package_name>_hook.js` to it and restart the server. Otherwise, use the script from the `output/` directory directly.
 
 > **Why `frida-compile`?** Frida 17+ removed the `Java` global from scripts loaded
 > via the Node.js API. `frida-compile` bundles `frida-java-bridge` directly into the
@@ -390,16 +390,20 @@ Save to `output_dir` (default `knoxspy_analysis/output/`):
 - `<package_name>_hook.js` — Compiled bundle that KnoxSpy loads
 - `<package_name>_analysis.md`
 
-**Server Integration (Mandatory)**:
-1. Copy the generated `<package_name>_hook.js` to `app/server/libraries/<package_name>_hook.js`.
-2. Update `app/server/config.yaml` to include the new hook by appending it to the `library:` list. Set the `platform` to `Android` or `iOS` depending on the target application:
-   ```yaml
-     - name: <package_name>
-       file: <package_name>_hook.js
-       platform: <Android or iOS>
-   ```
+**Server Integration (Conditional)**:
+Check if the `app/server/libraries/` directory and `app/server/config.yaml` file exist. They will not exist if the skill is installed at the user level (outside a knoxspy source tree).
+- **If they exist:**
+  1. Copy the generated `<package_name>_hook.js` to `app/server/libraries/<package_name>_hook.js`.
+  2. Update `app/server/config.yaml` to include the new hook by appending it to the `library:` list. Set the `platform` to `Android` or `iOS` depending on the target application:
+     ```yaml
+       - name: <package_name>
+         file: <package_name>_hook.js
+         platform: <Android or iOS>
+     ```
+- **If they do not exist:**
+  Skip this integration step and just leave the compiled script in `knoxspy_analysis/output/`.
 
-Print:
+Print the final status. If server integration was performed:
 ```
 ✅ Analysis complete for <package_name>
    Framework:       <framework_type>
@@ -412,6 +416,20 @@ Print:
      cd knoxspy_analysis/output
      npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
      cp <package_name>_hook.js ../../app/server/libraries/
+```
+
+If server integration was NOT performed (user-level skill):
+```
+✅ Analysis complete for <package_name>
+   Framework:       <framework_type>
+   Network Library: <network_lib>
+   Source File:     knoxspy_analysis/output/<package_name>_hook.entry.ts
+   Hook Script:     knoxspy_analysis/output/<package_name>_hook.js
+   Report:          knoxspy_analysis/output/<package_name>_analysis.md
+
+   To recompile after editing the hook:
+     cd knoxspy_analysis/output
+     npx frida-compile <package_name>_hook.entry.ts -o <package_name>_hook.js
 ```
 
 ## References
