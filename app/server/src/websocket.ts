@@ -1,9 +1,9 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { Server as HttpServer } from "http";
+import https from "https";
 import DBManager from "./database";
 import { FridaManager } from "./fridamanager";
 import Channels from "./channels";
-import { Session } from "frida";
 import REPLManager from "./repl";
 import { DeviceDetails, SessionInfo, App, DashboardData, DeviceInfo, AppsDetails, DashboardQueryParams } from "./types";
 
@@ -28,6 +28,13 @@ enum WebSocketAction {
 	REPEATER_UPDATE = "repeater.update",
 	REPEATER_REPLAY = "repeater.replay",
 	REPEATER_TAB_UPDATE = "repeater.tab.update",
+	REPEATER_HISTORY_GET = "repeater.history.get",
+	
+	SNIPPETS_INIT = "snippets.init",
+	SNIPPET_ADD = "snippet.add",
+	SNIPPET_UPDATE = "snippet.update",
+	SNIPPET_DELETE = "snippet.delete",
+	SNIPPET_FETCH_CODESHARE = "snippet.fetch_codeshare",
 	
 	DEVICES_INIT = "devices.init",
 	DEVICES_REFRESH = "devices.refresh",
@@ -59,6 +66,14 @@ enum WebSocketResponses {
 	RSP_REPEATER_UPDATE = "repeater.update.ack",
 	RSP_REPEATER_REPLAY = "repeater.replay.ack",
 	RSP_REPEATER_TAB_UPDATE = "repeater.tab.update.ack",
+	RSP_REPEATER_HISTORY = "repeater.history.ack",
+
+	RSP_SNIPPETS_INIT = "snippets.init.ack",
+	RSP_SNIPPET_ADD = "snippet.add.ack",
+	RSP_SNIPPET_UPDATE = "snippet.update.ack",
+	RSP_SNIPPET_DELETE = "snippet.delete.ack",
+	RSP_SNIPPET_FETCH_CODESHARE = "snippet.fetch_codeshare.ack",
+
 	RSP_DEVICES_INIT = "devices.init.ack",
 	RSP_DEVICES_REFRESH = "devices.refresh.ack",
 	RSP_APPS_INIT = "apps.init.ack",
@@ -341,6 +356,24 @@ class WebSocketClient {
 				case WebSocketAction.REPEATER_TAB_UPDATE:
 					await this.handleRepeaterTabUpdate(data);
 					break;
+				case WebSocketAction.REPEATER_HISTORY_GET:
+					await this.handleRepeaterHistoryGet(data);
+					break;
+				case WebSocketAction.SNIPPETS_INIT:
+					await this.handleSnippetsInit(data);
+					break;
+				case WebSocketAction.SNIPPET_ADD:
+					await this.handleSnippetAdd(data);
+					break;
+				case WebSocketAction.SNIPPET_UPDATE:
+					await this.handleSnippetUpdate(data);
+					break;
+				case WebSocketAction.SNIPPET_DELETE:
+					await this.handleSnippetDelete(data);
+					break;
+				case WebSocketAction.SNIPPET_FETCH_CODESHARE:
+					await this.handleSnippetFetchCodeshare(data);
+					break;
 				case WebSocketAction.CONNECTION_CLEAR:
 					await this.handleConnectionClear(data);
 					break;
@@ -410,6 +443,7 @@ class WebSocketClient {
 		}
 
 		const session = result.output;
+		const spawnedPid = result.pid!;
 		const t_app: App = {
 			id: data.appId,
 			name: data.appName,
@@ -433,30 +467,45 @@ class WebSocketClient {
 			data.sessionId
 		);
 
-		channel.connect();
+		await channel.connect();
 
 		activeSession = { session: session, app: t_app, status: true, channel: channel };
 		await fridaManager.saveActiveSession(session);
 
+		const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+
 		if (data.library) {
 			console.log("[REPL] (handleAppSpawn) Running script: " + data.library);
-			const repl = new REPLManager(activeSession, this.manager, this.dbManager);
 			await repl.run_script(data.library);
 		} else {
 			this.sendJsonError(["No library provided"]);
 		}
 
+		if (data.snippetIds && Array.isArray(data.snippetIds) && data.snippetIds.length > 0) {
+			console.log("[REPL] (handleAppSpawn) Injecting snippets:", data.snippetIds);
+			const snippets = await this.dbManager.getSnippetsByIds(data.snippetIds.map((id: any) => parseInt(id)));
+			for (const snippet of snippets) {
+				await repl.run_snippet(snippet.name, snippet.content);
+			}
+		}
+
+		// Resume the process ONLY after all scripts are loaded.
+		// This guarantees the Java bridge is in place before any app code runs.
+		console.log("[handleAppSpawn] All scripts loaded. Resuming pid:", spawnedPid);
+		await fridaManager.resumeApp(data.deviceId, spawnedPid);
 	}
+
 
 	private async handleAppAttach(data: any): Promise<void> {
 		const platform = data.platform;
 		const user = data.user;
 		const appName = data.appName;
+		const appId = data.appId;
 		const deviceId = data.deviceId;
 		let t_process = [];
 
 		if(platform.toLowerCase() === "android") {
-			t_process = await fridaManager.findProcessPidsByUid(deviceId, appName, parseInt(user));
+			t_process = await fridaManager.findProcessPidsByUid(deviceId, appId, parseInt(user));
 		} else {
 			t_process = await fridaManager.findProcesses(deviceId, appName);
 		}
@@ -466,9 +515,23 @@ class WebSocketClient {
 		}
 
 		console.log("[handleAppAttach] Process:", t_process);
+		
+		let selectedProcess: any = t_process[0];
+		if (platform.toLowerCase() === "android") {
+			const scoreProcess = (name: string): number => {
+				if (name === appId) return 0;
+				if (name.startsWith(appId + ":")) return 1;
+				if (name.includes(appId)) return 2;
+				return 3;
+			};
+			const sorted = [...t_process].sort((a: any, b: any) => {
+				return scoreProcess(a.name || "") - scoreProcess(b.name || "");
+			});
+			selectedProcess = sorted[0];
+			console.log("[handleAppAttach] Selected process:", selectedProcess);
+		}
 
-
-		const session = await fridaManager.attachToApp(data.deviceId, t_process[0].pid);
+		const session = await fridaManager.attachToApp(data.deviceId, selectedProcess.pid);
 
 		const t_app: App = {
 			id: data.appId,
@@ -488,22 +551,31 @@ class WebSocketClient {
 			data.platform,
 			data.user,
 			this.manager,
-			-1,
+			parseInt(selectedProcess.pid, 10),
 			this.sessionEventCallback,
 			data.sessionId
 		);
 
-		channel.connect();
+		await channel.connect();
 
 		activeSession = { session: session, app: t_app, status: true, channel: channel };
 		await fridaManager.saveActiveSession(session);
 
+		const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+
 		if (data.library) {
-			console.log("[REPL] (handleAppSpawn) Running script: " + data.library);
-			const repl = new REPLManager(activeSession, this.manager, this.dbManager);
+			console.log("[REPL] (handleAppAttach) Running script: " + data.library);
 			await repl.run_script(data.library);
 		} else {
 			this.sendJsonError(["No library provided"]);
+		}
+
+		if (data.snippetIds && Array.isArray(data.snippetIds) && data.snippetIds.length > 0) {
+			console.log("[REPL] (handleAppAttach) Injecting snippets:", data.snippetIds);
+			const snippets = await this.dbManager.getSnippetsByIds(data.snippetIds.map((id: any) => parseInt(id)));
+			for (const snippet of snippets) {
+				await repl.run_snippet(snippet.name, snippet.content);
+			}
 		}
 	}
 
@@ -650,6 +722,13 @@ class WebSocketClient {
 		activeSession = { session: null, app: null, status: false, channel: null };
 		await fridaManager.saveActiveSession(null);
 		console.log("[handleAppDisconnect] Active session cleared");
+		
+		this.manager.broadcastData({
+			action: "snippet.message",
+			snippet: "System",
+			message: "App disconnected, session cleared."
+		});
+
 		this.send({
 			action: WebSocketResponses.RSP_APP_CONNECTION,
 			status: true,
@@ -717,9 +796,13 @@ class WebSocketClient {
 				: "iOS_makeAPIRequest.js";
 
 		try {
+			if (!activeSession.app) {
+				return this.sendError("No active app session. Please connect to an app first.");
+			}
+
 			// Find the process
-			const deviceId = activeSession!.app!.deviceId;
-			const appName = activeSession!.app!.name;
+			const deviceId = activeSession.app.deviceId;
+			const appName = activeSession.app.name;
 			console.log("Searching for process", deviceId, appName);
 			let processes = [];
 			
@@ -768,6 +851,107 @@ class WebSocketClient {
 				id: data.id,
 				title: data.title,
 			});
+		}
+	}
+
+	private async handleRepeaterHistoryGet(data: any): Promise<void> {
+		const history = await this.dbManager.getRepeaterHistory(data.id);
+		this.send({
+			action: WebSocketResponses.RSP_REPEATER_HISTORY,
+			id: data.id,
+			history: JSON.stringify(history),
+		});
+	}
+
+	private async handleSnippetsInit(data: any): Promise<void> {
+		const snippets = await this.dbManager.getSnippets();
+		this.send({
+			action: WebSocketResponses.RSP_SNIPPETS_INIT,
+			snippets: JSON.stringify(snippets),
+		});
+	}
+
+	private async handleSnippetAdd(data: any): Promise<void> {
+		const id = await this.dbManager.addSnippet(data.snippet);
+		if (id !== -1) {
+			const snippets = await this.dbManager.getSnippets();
+			this.send({
+				action: WebSocketResponses.RSP_SNIPPET_ADD,
+				status: true,
+				id: id,
+				snippets: JSON.stringify(snippets),
+			});
+		} else {
+			this.sendError("Failed to add snippet");
+		}
+	}
+
+	private async handleSnippetUpdate(data: any): Promise<void> {
+		const success = await this.dbManager.updateSnippet(data.id, data.snippet);
+		if (success) {
+			const snippets = await this.dbManager.getSnippets();
+			this.send({
+				action: WebSocketResponses.RSP_SNIPPET_UPDATE,
+				status: true,
+				id: data.id,
+				snippets: JSON.stringify(snippets),
+			});
+		} else {
+			this.sendError("Failed to update snippet");
+		}
+	}
+
+	private async handleSnippetDelete(data: any): Promise<void> {
+		const success = await this.dbManager.deleteSnippet(data.id);
+		if (success) {
+			this.send({
+				action: WebSocketResponses.RSP_SNIPPET_DELETE,
+				status: true,
+				id: data.id,
+			});
+		} else {
+			this.sendError("Failed to delete snippet");
+		}
+	}
+
+	private async handleSnippetFetchCodeshare(data: any): Promise<void> {
+		const url = data.url;
+		if (!url) {
+			return this.sendError("No Codeshare URL provided");
+		}
+
+		try {
+			// Extract project name from URL (e.g. codeshare.frida.re/@dzonerzy/unpinning)
+			// We want to fetch from: https://codeshare.frida.re/api/project/@dzonerzy/unpinning/download
+			const codeshareMatch = url.match(/codeshare\.frida\.re\/(@[^\/]+\/[^\/]+)/);
+			if (!codeshareMatch) {
+				return this.sendError("Invalid Codeshare URL");
+			}
+
+			const projectPath = codeshareMatch[1];
+			const downloadUrl = `https://codeshare.frida.re/api/project/${projectPath}/download`;
+
+			https.get(downloadUrl, (res) => {
+				let body = "";
+				res.on("data", (chunk) => body += chunk);
+				res.on("end", () => {
+					if (res.statusCode === 200) {
+						this.send({
+							action: WebSocketResponses.RSP_SNIPPET_FETCH_CODESHARE,
+							status: true,
+							content: body,
+							name: projectPath,
+							url: url
+						});
+					} else {
+						this.sendError(`Failed to fetch from Codeshare (Status: ${res.statusCode})`);
+					}
+				});
+			}).on("error", (err) => {
+				this.sendError(`Error fetching from Codeshare: ${err.message}`);
+			});
+		} catch (error) {
+			this.sendError(`Failed to process Codeshare URL: ${error instanceof Error ? error.message : String(error)}`);
 		}
 	}
 

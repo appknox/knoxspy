@@ -40,6 +40,12 @@ Traditional proxy tools like **Burp Suite** fail when dealing with:
 - **Real-Time Analysis**: Live traffic capture and analysis
 - **Multi-User Support**: Android work profiles and secondary user support
 
+### 🤖 **AI-Powered Hook Generation (New!)**
+Powered by the new **`apk-network-hook-generator`** skill, KnoxSpy now writes its own hooks:
+- **Zero-Touch Decompilation**: Automatically reverse-engineers any arbitrary APK to expose its underlying architecture.
+- **Smart Network Discovery**: Dynamically detects the app's framework (Native, Flutter, React Native) and pinpoints obfuscated HTTP libraries.
+- **Instant Weaponization**: Generates ready-to-deploy, `frida-compile` compatible TypeScript agents that seamlessly bypass security protections and stream traffic directly into KnoxSpy.
+
 ### 🛠️ **Professional Toolkit**
 - **Traffic Replay**: Replay captured requests for testing
 - **Request Repeater**: Modify and replay captured requests with multi-tab support
@@ -143,6 +149,28 @@ Upload your own Frida agents as ZIP files:
 - Stored in `libraries/` directory
 - Database tracking for metadata
 - Pre-configured libraries loaded from `config.yaml` at startup
+
+> **Note on Frida 17+:** Due to changes in Frida 17, plain JavaScript hook scripts that rely on the `Java` global object no longer work. Custom agents must now be bundled using `frida-compile` and explicitly include `frida-java-bridge` to function correctly.
+
+**Example: Writing and Compiling a Custom Hook**
+
+1. Create your hook in a TypeScript file (`custom_hook.ts`):
+```typescript
+import Java from "frida-java-bridge";
+(globalThis as any).Java = Java;
+
+Java.perform(() => {
+    console.log("Hooking into Java API...");
+    // Your hook logic here
+});
+```
+
+2. Compile it using `frida-compile`:
+```bash
+npx frida-compile custom_hook.ts -o custom_hook.js
+```
+
+3. Move `custom_hook.js` into the `libraries/` directory and update your configuration.
 
 ---
 

@@ -10,6 +10,7 @@
             <li><router-link to="/apps"><i class="pi pi-th-large" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Apps</span></router-link></li>
             <li><router-link to="/traffic"><i class="pi pi-history mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">HTTP Traffic</span></router-link></li>
             <li><router-link to="/libraries"><i class="pi pi-folder mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Libraries</span></router-link></li>
+            <li><router-link to="/snippets"><i class="pi pi-code mr-2" style="margin-right: 10px"></i><span :class="{'active': isSidebarOpen}">Snippets</span></router-link></li>
         </ul>
     </div>
     <div id="splash-screen">
@@ -31,7 +32,7 @@
 <script lang="ts">
 import { defineComponent, watch } from "vue";
 import Button from "primevue/button";
-import InlineMessage from 'primevue/inlineMessage';
+import InlineMessage from 'primevue/inlinemessage';
 import { useAppStore, useWebSocketStore } from "../stores/session";
 import OverlayPanel from 'primevue/overlaypanel';
 import Toast from 'primevue/toast';
@@ -60,7 +61,7 @@ export default defineComponent({
         this.ws.addOnMessageHandler(this.handleMessage)
         window.addEventListener('beforeunload', this.handleReload)
 
-        watch(() => this.cs.getStatus.dashboardStatus, (newVal, oldVal) => {
+        watch(() => this.cs.getStatus.dashboardStatus, (newVal) => {
             if (newVal) {
                 document.getElementById('splash-screen')?.classList.add('hidden');
             }
@@ -77,7 +78,7 @@ export default defineComponent({
             this.cs.setStatusKey("sidebarStatus", !this.isSidebarOpen);
             this.isSidebarOpen = !this.isSidebarOpen;
         },
-        handleReload(event: any) {
+        handleReload() {
             // event.preventDefault();
             console.log("Reloading");
             // this.currentSession.dump();
@@ -86,7 +87,7 @@ export default defineComponent({
             console.log("showSticky", message, header, type);
             this.$toast.add({ severity: type as any, summary: header, detail: message, life: 3000});
         },
-        showConnectedApp(event: any) {
+        showConnectedApp() {
             this.$router.push('/apps/connected');
         }
     }

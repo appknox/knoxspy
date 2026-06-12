@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
     "@revolist/vue-datagrid": "^4.7.0-next.2",
     "@revolist/vue3-datagrid": "^4.0.0-next.1",
     "@wdns/vue-code-block": "^2.3.2",

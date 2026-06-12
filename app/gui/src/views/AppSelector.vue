@@ -19,6 +19,11 @@
                                 <Dropdown placeholder="Select a Library" v-model="cs.getSelection.library" :options="cs.getData.libraries" optionLabel="name" class="w-full md:w-14rem" @change="setLibrary"/>
                             </p>
                         </div>
+                        <div style="background-color: #efefef; padding: 3px; border-radius: 10px; margin-top: 10px;">
+                            <p class="m-0"><b style="margin-right: 10px;">Snippets</b>
+                                <MultiSelect v-model="selectedSnippets" :options="filteredSnippets" optionLabel="name" placeholder="Select Snippets" :maxSelectedLabels="3" class="w-full md:w-14rem" />
+                            </p>
+                        </div>
                     </div>
                     <div v-if="!cs.getStatus.appStatus" class="flex gap-4 mt-1" style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 20px">
                         <Button @click="actionHandler({ value: 'spawn' })" label="Spawn" severity="primary" class="w-full" style="margin-right: 10px;"/>
@@ -52,6 +57,7 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import Dropdown from "primevue/dropdown";
+import MultiSelect from 'primevue/multiselect';
 import Button from "primevue/button";
 import Card from 'primevue/card';
 import { useAppStore, useWebSocketStore } from "../stores/session";
@@ -61,17 +67,29 @@ import defaultPng from '../../public/default.png';
 
 export default defineComponent({
     name: "AppSelector",
-    components: { Dropdown, Button, Card, Footer, Skeleton },
+    components: { Dropdown, MultiSelect, Button, Card, Footer, Skeleton },
     data() {
         return {
             defaultPng,
             cs: useAppStore(),
             ws: useWebSocketStore(),
             needToConnectApp: false,
+            snippets: [] as any[],
+            selectedSnippets: [] as any[]
         };
+    },
+    computed: {
+        filteredSnippets(): any[] {
+            const platform = this.cs.getSelection.platform;
+            if (!platform) return this.snippets;
+            return this.snippets.filter((s: any) => s.platform.toLowerCase() === platform.toLowerCase());
+        }
     },
     created() {
         this.ws.addOnMessageHandler(this.wsMessage);
+        if (this.ws.isConnected) {
+            this.ws.send(JSON.stringify({ action: "snippets.init" }));
+        }
     },
     async mounted() {
         const t_requiredQueryParams = this.cs.checkRequiredQueryParams(this.$route.query);
@@ -156,6 +174,14 @@ export default defineComponent({
         wsMessage(message: any) {
             message = JSON.parse(message);
             console.log("AppSelector(wsMessage): Message:", message, message.action);
+            if (message.action === "snippets.init.ack") {
+                this.snippets = JSON.parse(message.snippets);
+            } else if (message.action === 'snippet.message') {
+                this.cs.addScriptLog({
+                    snippet: message.snippet,
+                    message: message.message
+                });
+            }
         },
         showConnectedApp(isConnected: boolean) {
             console.log("AppSelector(showConnectedApp): Connected app", isConnected);
@@ -175,7 +201,21 @@ export default defineComponent({
             console.log("AppSelector(startApp): Starting app ", action, this.cs.getSelection.action);
             this.cs.setStatusKey("appConnectingStatus", true);
             this.cs.startAppConnectionTimer();
-            const t_session_id = crypto.randomUUID();
+
+            let t_session_id: string;
+            if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                t_session_id = crypto.randomUUID();
+            } else {
+                // Fallback for non-secure contexts or older browsers
+                t_session_id = '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c: string) => {
+                    const n = parseInt(c);
+                    const randomValue = (typeof crypto !== 'undefined' && crypto.getRandomValues)
+                        ? crypto.getRandomValues(new Uint8Array(1))[0]
+                        : Math.floor(Math.random() * 256);
+                    return (n ^ (randomValue & (15 >> (n / 4)))).toString(16);
+                });
+            }
+
             this.cs.setSelectionKey("sessionId", t_session_id);
             this.cs.syncSelection();
             this.ws.send(JSON.stringify({
@@ -186,6 +226,7 @@ export default defineComponent({
                 "appName": this.cs.getSelection.app.name,
                 "user": this.cs.getSelection.user.id || -1,
                 "library": this.cs.getSelection.library ? this.cs.getSelection.library.file : null,
+                "snippetIds": this.selectedSnippets.map(s => s.id),
                 "sessionId": t_session_id
             }))
         },

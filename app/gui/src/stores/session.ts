@@ -36,14 +36,29 @@ export const useAppStore = defineStore('current_session', {
             app: {},
             session: {},
         } as ConnectedApp,
+        scriptLogs: [] as any[],
     }),
     getters: {
         getData: (state) => state.data,
         getSelection: (state) => state.selection,
         getStatus: (state) => state.status,
         getConnectedApp: (state) => state.connectedApp,
+        getScriptLogs: (state) => state.scriptLogs,
     },
     actions: {
+        addScriptLog(log: any) {
+            this.scriptLogs.push({
+                ...log,
+                time: new Date().toLocaleTimeString()
+            });
+            // Keep only last 1000 logs
+            if (this.scriptLogs.length > 1000) {
+                this.scriptLogs.shift();
+            }
+        },
+        clearScriptLogs() {
+            this.scriptLogs = [];
+        },
         setData(data: DashboardData) {
             this.data = data;
         },
@@ -126,8 +141,11 @@ export const useAppStore = defineStore('current_session', {
             if(this.getSelection.user.id) {
                 t_selection_minimal["user"] = this.getSelection.user.id;
             }
-            if(this.getSelection.library.file) {
-                t_selection_minimal["library"] = this.getSelection.library.file;
+            const selectedLibrary: any = this.getSelection.library;
+            if (typeof selectedLibrary === "string" && selectedLibrary) {
+                t_selection_minimal["library"] = selectedLibrary;
+            } else if (selectedLibrary?.file) {
+                t_selection_minimal["library"] = selectedLibrary.file;
             }
             if(this.getSelection.action) {
                 t_selection_minimal["action"] = this.getSelection.action;

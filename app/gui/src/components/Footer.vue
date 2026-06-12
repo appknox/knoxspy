@@ -147,10 +147,10 @@
 							<path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
 						</svg>
 					</div>
-					<div class="status-text">
-						<span ><b style="color: #ccc">Library: </b></span>
-						<span>{{ cs.getSelection.library.file ? cs.getSelection.library.file : '-' }}</span>
-					</div>
+						<div class="status-text">
+							<span ><b style="color: #ccc">Library: </b></span>
+							<span>{{ getSelectedLibraryFile() || '-' }}</span>
+						</div>
 					<div class="status-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -172,7 +172,7 @@
 <script>
 import { defineComponent, watch } from "vue";
 import { useAppStore, useWebSocketStore } from "../stores/session";
-import InlineMessage from "primevue/inlineMessage";
+import InlineMessage from "primevue/inlinemessage";
 
 /** ToDo
 - On clicking App Connection, check if data is loaded or not for app to launch
@@ -220,6 +220,12 @@ export default defineComponent({
 		});
 	},
 	methods: {
+		getSelectedLibraryFile() {
+			const selectedLibrary = this.cs.getSelection?.library;
+			if (!selectedLibrary) return "";
+			if (typeof selectedLibrary === "string") return selectedLibrary;
+			return selectedLibrary.file || "";
+		},
 		toggleDropdown(key) {
 			this.showDropdown[key] = !this.showDropdown[key];
 			if (this.showDropdown[key]) {
@@ -325,7 +331,7 @@ export default defineComponent({
 								user: this.cs.getSelection.user.id || -1,
 								device: this.cs.getSelection.device.id,
 								app: this.cs.getSelection.app.id,
-								library: this.cs.getSelection.library.file,
+									library: this.getSelectedLibraryFile(),
 								action: this.cs.getSelection.action || "spawn"
 							}
 						})
@@ -395,17 +401,17 @@ export default defineComponent({
 				this.cs.setSelectionKey("session", message.session);
 				this.ws.send(JSON.stringify({ action: "traffic.init", sessionId: message.session.id }));
 				this.ws.send(JSON.stringify({ action: "repeater.init", sessionId: message.session.id }));
-			} else if (message.action === "library.change.ack") {
-				const t_lib = this.cs.getData.libraries.filter(lib => lib.file === message.library)[0];
-				this.cs.setSelectionKey("library", t_lib);
-				console.log("Footer(wsMessage): Library changed to", message.library, this.cs.getSelection);
-				this.$router.replace({
-					query: {
-						...this.$route.query,
-						library: t_lib.file,
-					}
-				});
-			}
+				} else if (message.action === "library.change.ack") {
+					const t_lib = this.cs.getData.libraries.filter(lib => lib.file === message.library)[0] || { file: message.library, name: message.library };
+					this.cs.setSelectionKey("library", t_lib);
+					console.log("Footer(wsMessage): Library changed to", message.library, this.cs.getSelection);
+					this.$router.replace({
+						query: {
+							...this.$route.query,
+							library: t_lib?.file || message.library || "",
+						}
+					});
+				}
 		},
 	},
 	unmounted() {
